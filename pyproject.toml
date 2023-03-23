@@ -15,6 +15,8 @@ Jinja2 = "^3.1.2"
 loguru = "^0.6.0"
 asgiref = "^3.6.0"
 boussole = "^2.1.0"
+httpx = {version = "^0.23.3", extras = ["http2"]}
+beautifulsoup4 = "^4.12.0"
 
 [tool.poetry.dev-dependencies]
 

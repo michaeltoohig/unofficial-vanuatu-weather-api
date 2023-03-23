@@ -17,6 +17,7 @@ except ImportError:
     VERSION_COMMIT = get_version_commit()
 
 VERSION = f"0.0.1+{VERSION_COMMIT}"
+USER_AGENT = f"vmgd-api/{VERSION}"
 
 # Force reloading cache when the CSS is updated
 CSS_HASH = "none"
