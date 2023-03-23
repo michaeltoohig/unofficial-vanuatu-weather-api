@@ -1,0 +1,24 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="x-ua-compatible" content="ie=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<link rel="stylesheet" href="{{ BASE_URL }}/static/css/main.css?v={{ CSS_HASH }}">
+<link rel="icon" type="image/x-icon" href="{{ BASE_URL }}/static/favicon.ico">
+{% block head %}{% endblock %}
+</head>
+<body>
+<div id="main">
+<main{%- block main_tag %}{%- endblock %}>
+{% block content %}{% endblock %}
+</main>
+</div>
+
+<footer class="footer">
+  <div class="box">
+    API <small class="microblogpub-version"><code>{{ project_version }}</code></small> data sourced from <a href="https://vmgd.gov.vu">Vanuatu Meteorology & Geo-Hazards Department</a>.
+  </div>
+</footer>
+</body>
+</html>
