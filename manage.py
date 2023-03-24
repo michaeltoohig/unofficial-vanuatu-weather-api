@@ -2,6 +2,7 @@
 from pathlib import Path
 import signal
 import subprocess
+import anyio
 import click
 
 
@@ -33,6 +34,12 @@ def compile_scss(watch):
 def dev():
     run(["uvicorn", "app.main:app", "--reload"])
     
+
+@cli.command()
+def fetch_data():
+    from app.vmgd import run_fetch_all_pages
+
+    anyio.run(run_fetch_all_pages)
 
 
 if __name__ == "__main__":

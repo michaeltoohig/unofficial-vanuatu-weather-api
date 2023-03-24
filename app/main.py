@@ -159,7 +159,7 @@ async def custom_http_exception_handler(
 
 
 @app.get("/")
-async def get_remote_follow(
+async def index(
     request: Request,
     db_session: AsyncSession = Depends(get_db_session),
 ) -> templates.TemplateResponse:
