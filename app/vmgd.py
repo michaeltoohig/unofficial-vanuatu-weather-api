@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+import uuid
 
 import anyio
 from bs4 import BeautifulSoup
@@ -25,16 +26,39 @@ async def run_fetch_all_pages() -> None:
     async with httpx.AsyncClient(headers=headers, timeout=30.0) as client:
         async with anyio.create_task_group() as tg:
             tg.start_soon(_fetch_forecast, client)
-            tg.start_soon(_fetch_public_forecast, client)
-            tg.start_soon(_fetch_public_forecast_policy, client)
-            tg.start_soon(_fetch_severe_weather_outlook, client)
-            tg.start_soon(_fetch_public_forecast_tc_outlook, client)
-            tg.start_soon(_fetch_public_forecast_7_day, client)
-            tg.start_soon(_fetch_public_forecast_media, client)
-            tg.start_soon(_fetch_current_bulletin, client)
-            tg.start_soon(_fetch_severe_weather_warning, client)
-            tg.start_soon(_fetch_marine_waring, client)
-            tg.start_soon(_fetch_hight_seas_warning, client)
+            # tg.start_soon(_fetch_public_forecast, client)
+            # tg.start_soon(_fetch_public_forecast_policy, client)
+            # tg.start_soon(_fetch_severe_weather_outlook, client)
+            # tg.start_soon(_fetch_public_forecast_tc_outlook, client)
+            # tg.start_soon(_fetch_public_forecast_7_day, client)
+            # tg.start_soon(_fetch_public_forecast_media, client)
+            # tg.start_soon(_fetch_current_bulletin, client)
+            # tg.start_soon(_fetch_severe_weather_warning, client)
+            # tg.start_soon(_fetch_marine_waring, client)
+            # tg.start_soon(_fetch_hight_seas_warning, client)
+
+
+def _save_html(html: str, fp: Path):
+    vmgd_directory = Path(ROOT_DIR / "data" / "vmgd")
+    if fp.is_absolute():
+        if not fp.is_relative_to(vmgd_directory):
+            raise Exception(f"Bad path for saving html {fp}")
+    else:
+        fp = vmgd_directory / fp
+    fp.write_text(html)
+
+
+class VMGDResponseNotOK(Exception):
+    """The response from VMGD was not OK."""
+
+    def __init__(self, html: str, msg: str = None):
+        self.msg = msg if msg else "The response from VMGD was not OK"
+        fp = Path("errors" / str(uuid.uuid4()))
+        logger.error(self.msg, response=str(fp))
+        _save_html(html, fp)
+
+    def __str__(self):
+        return self.msg
 
 
 async def _fetch(client: httpx.AsyncClient, url) -> httpx.Response:
@@ -50,11 +74,11 @@ async def _fetch(client: httpx.AsyncClient, url) -> httpx.Response:
         # TODO retry httpx.ConnectError
         resp = await client.get(url)
         if resp.status_code == httpx.codes.OK:
-            cached_page.write_text(resp.text)
             html = resp.text
+            # _save_html(html, cached_page)
+            cached_page.write_text(html)
         else:
-            # TODO handle 404 or 500 or if we become blocked or something
-            resp.raise_for_status()
+            raise VMGDResponseNotOK(resp.text, f"Status not OK for {url=}")
     else:
         logger.info(f"Fetching page from cache {slug=}")
         html = cached_page.read_text()
@@ -80,9 +104,9 @@ async def _fetch_forecast(client: httpx.AsyncClient) -> None:
             weathers_script = script
             break
     else:
-        raise Exception("Weather variable not found")
+        raise VMGDResponseNotOK("script containing `var weathers` not found")
     # Extract JSON data from script tag
-    weathers_line = weathers_script.strip().split("\n", 1)[0]
+    weathers_line = weathers_script.text.strip().split("\n", 1)[0]
     weathers_array_string = weathers_line.split(" = ", 1)[1].rsplit(";", 1)[0]
     weathers = json.loads(weathers_array_string)
     # TODO save weather data to persistent storage
@@ -110,7 +134,7 @@ async def _fetch_public_forecast_policy(client: httpx.AsyncClient) -> None:
     html = await _fetch(client, url)
     # TODO hash text contents of `<table class="forecastPublic">` to make a sanity
     # check that data presented or how data is processed is not changed. Only store
-    # copies of the page that show a new hash value... I think. But maybe this is 
+    # copies of the page that show a new hash value... I think. But maybe this is
     # the wrong html page downloaded as it appears same as `publice-forecast`
 
 
@@ -134,6 +158,9 @@ async def _fetch_public_forecast_tc_outlook(client: httpx.AsyncClient) -> None:
 
 
 async def _fetch_public_forecast_7_day(client: httpx.AsyncClient) -> None:
+    """Simple weekly forecast for all locations containing daily low/high temperature,
+    and weather condition summary.
+    """
     url = "/forecast-division/public-forecast/7-day"
     html = await _fetch(client, url)
     soup = BeautifulSoup(html, "html.parser")
@@ -148,20 +175,21 @@ async def _fetch_public_forecast_7_day(client: httpx.AsyncClient) -> None:
             summary = forecast.split(".", 1)[0]
             minTemp = forecast.split("Min:", 1)[1].split("&", 1)[0].strip()
             maxTemp = forecast.split("Max:", 1)[1].split("&", 1)[0].strip()
-            forecast_week.append(dict(
-                location=location,
-                date=date,
-                summary=summary,
-                minTemp=minTemp,
-                maxTemp=maxTemp,
-            ))
-    # TODO save weather data to persistent storage
+            forecast_week.append(
+                dict(
+                    location=location,
+                    date=date,
+                    summary=summary,
+                    minTemp=minTemp,
+                    maxTemp=maxTemp,
+                )
+            )
 
 
 async def _fetch_public_forecast_media(client: httpx.AsyncClient) -> None:
     url = "/forecast-division/public-forecast/media"
     html = await _fetch(client, url)
-    # TODO extract data from `<table class="forecastPublic">` and download encoded `.png` file in `img` tag. 
+    # TODO extract data from `<table class="forecastPublic">` and download encoded `.png` file in `img` tag.
 
 
 # Warnings
@@ -184,7 +212,7 @@ async def _fetch_current_bulletin(client: httpx.AsyncClient) -> None:
 async def _fetch_severe_weather_warning(client: httpx.AsyncClient) -> None:
     url = "/forecast-division/warnings/severe-weather-warning"
     html = await _fetch(client, url)
-    # TODO extract data from table with class `marineFrontTabOne` 
+    # TODO extract data from table with class `marineFrontTabOne`
 
 
 async def _fetch_marine_waring(client: httpx.AsyncClient) -> None:
