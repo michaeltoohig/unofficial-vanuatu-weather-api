@@ -7,6 +7,7 @@ from bs4 import BeautifulSoup
 import httpx
 from loguru import logger
 
+from app import models
 from app.config import ROOT_DIR, USER_AGENT
 from app.utils.datetime import now
 
@@ -30,7 +31,7 @@ async def run_fetch_all_pages() -> None:
             # tg.start_soon(_fetch_public_forecast_policy, client)
             # tg.start_soon(_fetch_severe_weather_outlook, client)
             # tg.start_soon(_fetch_public_forecast_tc_outlook, client)
-            # tg.start_soon(_fetch_public_forecast_7_day, client)
+            tg.start_soon(_fetch_public_forecast_7_day, client)
             # tg.start_soon(_fetch_public_forecast_media, client)
             # tg.start_soon(_fetch_current_bulletin, client)
             # tg.start_soon(_fetch_severe_weather_warning, client)
@@ -66,6 +67,8 @@ async def _fetch(client: httpx.AsyncClient, url) -> httpx.Response:
     Currently we store a cached copy for development purposes but in the future I will
     keep the `/data/vmgd` directory to store pages that fail scraping for debugging.
     """
+    page = models.Page(fetched_at=now(), url=url)
+    import pdb; pdb.set_trace()  # fmt: skip
     slug = url.rsplit("/", 1)[1]
     url = BASE_URL + url
     cached_page = Path(ROOT_DIR / "data" / "vmgd" / slug)
@@ -184,6 +187,7 @@ async def _fetch_public_forecast_7_day(client: httpx.AsyncClient) -> None:
                     maxTemp=maxTemp,
                 )
             )
+    print(forecast_week)
 
 
 async def _fetch_public_forecast_media(client: httpx.AsyncClient) -> None:
