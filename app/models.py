@@ -30,6 +30,9 @@ class Page(Base):
     url = Column(String, nullable=False)
     _json_data = Column("json_data", String, nullable=False)
 
+    def __init__(self, url: str):
+        self.url = url
+
     @property
     def json_data(self):
         return json.loads(self._json_data)

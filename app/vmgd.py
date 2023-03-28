@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
 import uuid
@@ -9,6 +10,7 @@ from loguru import logger
 
 from app import models
 from app.config import ROOT_DIR, USER_AGENT
+from app.database import async_session
 from app.utils.datetime import now
 
 
@@ -62,16 +64,13 @@ class VMGDResponseNotOK(Exception):
         return self.msg
 
 
-async def _fetch(client: httpx.AsyncClient, url) -> httpx.Response:
+async def _fetch(client: httpx.AsyncClient, page: models.Page) -> httpx.Response:
     """Fetch the web page.
     Currently we store a cached copy for development purposes but in the future I will
     keep the `/data/vmgd` directory to store pages that fail scraping for debugging.
     """
-    page = models.Page(fetched_at=now(), url=url)
-    import pdb; pdb.set_trace()  # fmt: skip
-    slug = url.rsplit("/", 1)[1]
-    url = BASE_URL + url
-    cached_page = Path(ROOT_DIR / "data" / "vmgd" / slug)
+    url = BASE_URL + page.url
+    cached_page = Path(ROOT_DIR / "data" / "vmgd" / page.slug)
     if not cached_page.exists():
         logger.info(f"Fetching {url=}")
         # TODO retry httpx.ConnectError
@@ -80,10 +79,12 @@ async def _fetch(client: httpx.AsyncClient, url) -> httpx.Response:
             html = resp.text
             # _save_html(html, cached_page)
             cached_page.write_text(html)
+            # async with async_session() as db_session:
+            #     db_session.add(page)
         else:
             raise VMGDResponseNotOK(resp.text, f"Status not OK for {url=}")
     else:
-        logger.info(f"Fetching page from cache {slug=}")
+        logger.info(f"Fetching page from cache {page.slug=}")
         html = cached_page.read_text()
     return html
 
@@ -97,8 +98,9 @@ async def _fetch_forecast(client: httpx.AsyncClient) -> None:
     The specifics of how to decode the `weathers` array is found in the `xmlForecast.js`
     file that is on the page.
     """
-    url = "/forecast-division"
-    html = await _fetch(client, url)
+    page = models.Page(url="/forecast-division")
+    html = await _fetch(client, page)
+    page.fetched_at = now()
     soup = BeautifulSoup(html, "html.parser")
     # Find weather script tag
     weathers_script = None
@@ -112,7 +114,11 @@ async def _fetch_forecast(client: httpx.AsyncClient) -> None:
     weathers_line = weathers_script.text.strip().split("\n", 1)[0]
     weathers_array_string = weathers_line.split(" = ", 1)[1].rsplit(";", 1)[0]
     weathers = json.loads(weathers_array_string)
-    # TODO save weather data to persistent storage
+    # TODO assert schema of weathers then save to storage
+    page.json_data = weathers
+    async with async_session() as db_session:
+        db_session.add(page)
+        await db_session.commit()
 
 
 # Public Forecast
@@ -164,10 +170,12 @@ async def _fetch_public_forecast_7_day(client: httpx.AsyncClient) -> None:
     """Simple weekly forecast for all locations containing daily low/high temperature,
     and weather condition summary.
     """
-    url = "/forecast-division/public-forecast/7-day"
-    html = await _fetch(client, url)
+    page = models.Page(url="/forecast-division/public-forecast/7-day")
+    html = await _fetch(client, page)
+    page.fetched_at = now()
     soup = BeautifulSoup(html, "html.parser")
-    # Extract data from individual tables for each location
+    
+    # grab data for each location from individual tables
     forecast_week = []
     for table in soup.article.find_all("table"):
         for count, tr in enumerate(table.find_all("tr")):
@@ -187,8 +195,20 @@ async def _fetch_public_forecast_7_day(client: httpx.AsyncClient) -> None:
                     maxTemp=maxTemp,
                 )
             )
-    print(forecast_week)
+    page.json_data = forecast_week
+    async with async_session() as db_session:
+        db_session.add(page)
+        await db_session.commit()
 
+    # grab issued at date time
+    issued_str = soup.article.find("strong").text.lower()
+    # TODO regex for "Mon 27th March, 2023 at 15:02 (UTC Time:04:02)" or "Tue 28th March, 2023 at 16:05 (UTC Time:05:05)"
+    # below is a bewildering work around
+    local_date = forecast_week[0]["date"]  # use first date in first table to find date issued HACK
+    utc_time = datetime.strptime(issued_str.split("utc time:")[1][:4], "%H:%M")
+    utc_dt = utc_time.replace(year=local_date.year, month=local_date.month, day=local_date.day)
+    vu_tz = timezone(timedelta(hours=11))
+    issued_at = utc_dt.astimezone(vu_tz)
 
 async def _fetch_public_forecast_media(client: httpx.AsyncClient) -> None:
     url = "/forecast-division/public-forecast/media"
