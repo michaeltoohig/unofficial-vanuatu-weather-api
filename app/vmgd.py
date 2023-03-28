@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, time, timedelta, timezone
 import json
 from pathlib import Path
 import uuid
@@ -102,6 +102,7 @@ async def _fetch_forecast(client: httpx.AsyncClient) -> None:
     html = await _fetch(client, page)
     page.fetched_at = now()
     soup = BeautifulSoup(html, "html.parser")
+
     # Find weather script tag
     weathers_script = None
     for script in soup.find_all("script"):
@@ -110,12 +111,25 @@ async def _fetch_forecast(client: httpx.AsyncClient) -> None:
             break
     else:
         raise VMGDResponseNotOK("script containing `var weathers` not found")
-    # Extract JSON data from script tag
+
+    # grab JSON data from script tag
     weathers_line = weathers_script.text.strip().split("\n", 1)[0]
     weathers_array_string = weathers_line.split(" = ", 1)[1].rsplit(";", 1)[0]
     weathers = json.loads(weathers_array_string)
     # TODO assert schema of weathers then save to storage
     page.json_data = weathers
+
+    # grab issue date
+    issued_str = soup.find("div", id="issueDate").text.lower().strip()
+    issued_date_str, issued_time_str = issued_str.split("date: ", 1)[1].split("(utc time")[0].strip().split(" at ")
+    issued_date_str = issued_date_str[:6] + issued_date_str[8:]  # remove 'st', 'nd', 'rd', 'th'
+    issued_at = datetime.strptime(issued_date_str, "%a %d %B, %Y")
+    issued_at = datetime.combine(date=issued_at.date(), time=datetime.strptime(issued_time_str, "%H:%M").time())
+    tz_vu = timezone(timedelta(hours=11))
+    issued_at = issued_at.replace(tzinfo=tz_vu)
+    issued_at_utc = issued_at.astimezone(timezone.utc)
+    page.issued_at = issued_at_utc
+
     async with async_session() as db_session:
         db_session.add(page)
         await db_session.commit()
@@ -196,19 +210,25 @@ async def _fetch_public_forecast_7_day(client: httpx.AsyncClient) -> None:
                 )
             )
     page.json_data = forecast_week
+
+    # grab issued at date time
+    issued_str = soup.article.find("table").find_previous_sibling("strong").text.lower()
+    # examples include "Mon 27th March, 2023 at 15:02 (UTC Time:04:02)" or "Tue 28th March, 2023 at 16:05 (UTC Time:05:05)"
+    issued_str = issued_str.split("(utc time",  1)[0].split("port vila at")[1].strip()
+    issued_date_str, issued_time_str = issued_str.split(" at ")
+    issued_date_str = issued_date_str[:6] + issued_date_str[8:]  # remove 'st', 'nd', 'rd', 'th'
+    issued_at = datetime.strptime(issued_date_str, "%a %d %B, %Y")
+    issued_at = datetime.combine(date=issued_at.date(), time=datetime.strptime(issued_time_str, "%H:%M").time())
+    tz_vu = timezone(timedelta(hours=11))
+    issued_at = issued_at.replace(tzinfo=tz_vu)
+    issued_at_utc = issued_at.astimezone(timezone.utc)
+    page.issued_at = issued_at_utc
+
+    # save page
     async with async_session() as db_session:
         db_session.add(page)
         await db_session.commit()
 
-    # grab issued at date time
-    issued_str = soup.article.find("strong").text.lower()
-    # TODO regex for "Mon 27th March, 2023 at 15:02 (UTC Time:04:02)" or "Tue 28th March, 2023 at 16:05 (UTC Time:05:05)"
-    # below is a bewildering work around
-    local_date = forecast_week[0]["date"]  # use first date in first table to find date issued HACK
-    utc_time = datetime.strptime(issued_str.split("utc time:")[1][:4], "%H:%M")
-    utc_dt = utc_time.replace(year=local_date.year, month=local_date.month, day=local_date.day)
-    vu_tz = timezone(timedelta(hours=11))
-    issued_at = utc_dt.astimezone(vu_tz)
 
 async def _fetch_public_forecast_media(client: httpx.AsyncClient) -> None:
     url = "/forecast-division/public-forecast/media"

@@ -26,6 +26,7 @@ class Page(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     fetched_at = Column(DateTime(timezone=True), nullable=False)
+    issued_at = Column(DateTime(timezone=True), nullable=False)
 
     url = Column(String, nullable=False)
     _json_data = Column("json_data", String, nullable=False)
