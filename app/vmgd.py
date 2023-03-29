@@ -11,6 +11,7 @@ from loguru import logger
 from app import models
 from app.config import ROOT_DIR, USER_AGENT
 from app.database import async_session
+from app.pages import extract_issued_at_datetime
 from app.utils.datetime import now
 
 
@@ -121,14 +122,15 @@ async def _fetch_forecast(client: httpx.AsyncClient) -> None:
 
     # grab issue date
     issued_str = soup.find("div", id="issueDate").text.lower().strip()
-    issued_date_str, issued_time_str = issued_str.split("date: ", 1)[1].split("(utc time")[0].strip().split(" at ")
-    issued_date_str = issued_date_str[:6] + issued_date_str[8:]  # remove 'st', 'nd', 'rd', 'th'
-    issued_at = datetime.strptime(issued_date_str, "%a %d %B, %Y")
-    issued_at = datetime.combine(date=issued_at.date(), time=datetime.strptime(issued_time_str, "%H:%M").time())
-    tz_vu = timezone(timedelta(hours=11))
-    issued_at = issued_at.replace(tzinfo=tz_vu)
-    issued_at_utc = issued_at.astimezone(timezone.utc)
-    page.issued_at = issued_at_utc
+    # issued_date_str, issued_time_str = issued_str.split("date: ", 1)[1].split("(utc time")[0].strip().split(" at ")
+    # issued_date_str = issued_date_str[:6] + issued_date_str[8:]  # remove 'st', 'nd', 'rd', 'th'
+    # issued_at = datetime.strptime(issued_date_str, "%a %d %B, %Y")
+    # issued_at = datetime.combine(date=issued_at.date(), time=datetime.strptime(issued_time_str, "%H:%M").time())
+    # tz_vu = timezone(timedelta(hours=11))
+    # issued_at = issued_at.replace(tzinfo=tz_vu)
+    # issued_at_utc = issued_at.astimezone(timezone.utc)
+    issued_at = extract_issued_at_datetime(issued_str)
+    page.issued_at = issued_at
 
     async with async_session() as db_session:
         db_session.add(page)
@@ -215,14 +217,15 @@ async def _fetch_public_forecast_7_day(client: httpx.AsyncClient) -> None:
     issued_str = soup.article.find("table").find_previous_sibling("strong").text.lower()
     # examples include "Mon 27th March, 2023 at 15:02 (UTC Time:04:02)" or "Tue 28th March, 2023 at 16:05 (UTC Time:05:05)"
     issued_str = issued_str.split("(utc time",  1)[0].split("port vila at")[1].strip()
-    issued_date_str, issued_time_str = issued_str.split(" at ")
-    issued_date_str = issued_date_str[:6] + issued_date_str[8:]  # remove 'st', 'nd', 'rd', 'th'
-    issued_at = datetime.strptime(issued_date_str, "%a %d %B, %Y")
-    issued_at = datetime.combine(date=issued_at.date(), time=datetime.strptime(issued_time_str, "%H:%M").time())
-    tz_vu = timezone(timedelta(hours=11))
-    issued_at = issued_at.replace(tzinfo=tz_vu)
-    issued_at_utc = issued_at.astimezone(timezone.utc)
-    page.issued_at = issued_at_utc
+    issued_at = extract_issued_at_datetime(issued_str)
+    # issued_date_str, issued_time_str = issued_str.split(" at ")
+    # issued_date_str = issued_date_str[:6] + issued_date_str[8:]  # remove 'st', 'nd', 'rd', 'th'
+    # issued_at = datetime.strptime(issued_date_str, "%a %d %B, %Y")
+    # issued_at = datetime.combine(date=issued_at.date(), time=datetime.strptime(issued_time_str, "%H:%M").time())
+    # tz_vu = timezone(timedelta(hours=11))
+    # issued_at = issued_at.replace(tzinfo=tz_vu)
+    # issued_at_utc = issued_at.astimezone(timezone.utc)
+    page.issued_at = issued_at
 
     # save page
     async with async_session() as db_session:

@@ -5,4 +5,8 @@
 
 {% block content %}
 Hello World
+
+{% for page in pages %}
+{{ page.id }} - {{ page.url }}
+{% endfor %}
 {% endblock %}

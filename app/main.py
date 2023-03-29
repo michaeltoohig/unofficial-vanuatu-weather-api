@@ -17,9 +17,12 @@ from starlette.responses import JSONResponse
 from starlette.types import Message
 
 
-from app import templates
+from sqlalchemy import select
+
+from app import models, templates
 from app.config import DEBUG
 from app.database import AsyncSession, async_session, get_db_session
+from app.pages import get_latest_page
 
 
 
@@ -163,9 +166,29 @@ async def index(
     request: Request,
     db_session: AsyncSession = Depends(get_db_session),
 ) -> templates.TemplateResponse:
+    query = select(models.Page)
+    results = await db_session.execute(query)
     return await templates.render_template(
         db_session,
         request,
         "index.html",
-        {},
+        {
+            "pages": results.scalars(),
+        },
     )
+
+
+@app.get("/v1/raw/pages")
+async def raw_pages(
+    request: Request,
+    db_session: AsyncSession = Depends(get_db_session),
+):
+    page = await get_latest_page(db_session)
+    # TODO look at using pydantic models to change models into schemas for API
+    # or consider the downsides of manually defining JSON responses as below
+    return {
+        "fetched_at": page.fetched_at,
+        "issued_at": page.issued_at,
+        "url": page.url,
+        "data": page.json_data,
+    }
