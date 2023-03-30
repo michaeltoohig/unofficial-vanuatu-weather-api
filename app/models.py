@@ -42,10 +42,6 @@ class Page(Base):
     def json_data(self, data):
         self._json_data = json.dumps(data)
 
-    @property
-    def slug(self):
-        return self.url.rsplit("/", 1)[1]
-
 
 class PageError(Base):
     __tablename__ = "page_error"

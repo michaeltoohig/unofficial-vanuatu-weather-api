@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import datetime, time, timedelta, timezone
 import json
 from pathlib import Path
@@ -8,8 +9,7 @@ from bs4 import BeautifulSoup
 import httpx
 from loguru import logger
 
-from app import models
-from app.config import ROOT_DIR, USER_AGENT
+from app import config, models
 from app.database import async_session
 from app.pages import extract_issued_at_datetime
 from app.utils.datetime import now
@@ -18,32 +18,8 @@ from app.utils.datetime import now
 BASE_URL = "https://www.vmgd.gov.vu/vmgd/index.php"
 
 
-async def fetch_all_pages(db_session) -> None:
-    pass
-
-
-async def run_fetch_all_pages() -> None:
-    """CLI entrypoint."""
-    headers = {
-        "User-Agent": USER_AGENT,
-    }
-    async with httpx.AsyncClient(headers=headers, timeout=30.0) as client:
-        async with anyio.create_task_group() as tg:
-            tg.start_soon(_fetch_forecast, client)
-            # tg.start_soon(_fetch_public_forecast, client)
-            # tg.start_soon(_fetch_public_forecast_policy, client)
-            # tg.start_soon(_fetch_severe_weather_outlook, client)
-            # tg.start_soon(_fetch_public_forecast_tc_outlook, client)
-            tg.start_soon(_fetch_public_forecast_7_day, client)
-            # tg.start_soon(_fetch_public_forecast_media, client)
-            # tg.start_soon(_fetch_current_bulletin, client)
-            # tg.start_soon(_fetch_severe_weather_warning, client)
-            # tg.start_soon(_fetch_marine_waring, client)
-            # tg.start_soon(_fetch_hight_seas_warning, client)
-
-
 def _save_html(html: str, fp: Path):
-    vmgd_directory = Path(ROOT_DIR / "data" / "vmgd")
+    vmgd_directory = Path(config.ROOT_DIR / "data" / "vmgd")
     if fp.is_absolute():
         if not fp.is_relative_to(vmgd_directory):
             raise Exception(f"Bad path for saving html {fp}")
@@ -52,42 +28,102 @@ def _save_html(html: str, fp: Path):
     fp.write_text(html)
 
 
-class VMGDResponseNotOK(Exception):
-    """The response from VMGD was not OK."""
+class FetchError(Exception):
+    def __init__(self, url: str, resp: httpx.Response | None = None) -> None:
+        resp_part = ""
+        if resp:
+            fp = Path("errors" / str(uuid.uuid4()))
+            _save_html(resp.text, fp)
+            resp_part = f", got HTTP {resp.status_code}, review HTML at {str(fp)}"
+        message = f"Failed to fetch {url}{resp_part}"
+        super().__init__(message)
+        self.resp = resp
+        self.url = url
 
-    def __init__(self, html: str, msg: str = None):
-        self.msg = msg if msg else "The response from VMGD was not OK"
-        fp = Path("errors" / str(uuid.uuid4()))
-        logger.error(self.msg, response=str(fp))
-        _save_html(html, fp)
 
-    def __str__(self):
-        return self.msg
+class PageUnavailableError(FetchError):
+    pass
 
 
-async def _fetch(client: httpx.AsyncClient, page: models.Page) -> httpx.Response:
-    """Fetch the web page.
-    Currently we store a cached copy for development purposes but in the future I will
-    keep the `/data/vmgd` directory to store pages that fail scraping for debugging.
-    """
+class PageNotFoundError(FetchError)
+    pass
+
+
+async def fetch(url: str) -> str:
+    logger.info(f"Fetching {url}")
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            url,
+            headers={
+                "User-Agent": config.USER_AGENT,
+                "Accept": config.AP_CONTENT_TYPE,
+            },
+            params=params,
+            follow_redirects=True,
+            auth=None if disable_httpsig else auth,
+        )
+
+    if resp.status_code in [401, 403]:
+        raise PageUnavailableError(url, resp)
+    elif resp.status_code == 404:
+        raise PageNotFoundError(url, resp)
+
+    try:
+        resp.raise_for_status()
+    except httpx.HTTPError as http_error:
+        raise FetchError(url, resp) from http_error
+
+    return resp.html
+
+
+async def fetch_page(db_session: AsyncSession, page: PageToFetch) -> str:
     url = BASE_URL + page.url
-    cached_page = Path(ROOT_DIR / "data" / "vmgd" / page.slug)
-    if not cached_page.exists():
-        logger.info(f"Fetching {url=}")
-        # TODO retry httpx.ConnectError
-        resp = await client.get(url)
-        if resp.status_code == httpx.codes.OK:
-            html = resp.text
-            # _save_html(html, cached_page)
-            cached_page.write_text(html)
-            # async with async_session() as db_session:
-            #     db_session.add(page)
-        else:
-            raise VMGDResponseNotOK(resp.text, f"Status not OK for {url=}")
-    else:
+    cached_page = Path(config.ROOT_DIR / "data" / "vmgd" / page.slug)
+    if cached_page.exists():
         logger.info(f"Fetching page from cache {page.slug=}")
         html = cached_page.read_text()
+    else:
+        html = await fetch(url)
+        cached_page.write_text(html)
     return html
+
+    # existing_actor = (
+    #     await db_session.scalars(
+    #         select(models.Actor).where(
+    #             models.Actor.ap_id == actor_id,
+    #         )
+    #     )
+    # ).one_or_none()
+    # if existing_actor:
+    #     if existing_actor.is_deleted:
+    #         raise ap.ObjectNotFoundError(f"{actor_id} was deleted")
+
+
+
+# async def fetch_page(client: httpx.AsyncClient, page: models.Page) -> httpx.Response:
+#     """Fetch the web page.
+#     Currently we store a cached copy for development purposes but in the future I will
+#     keep the `/data/vmgd` directory to store pages that fail scraping for debugging.
+#     """
+#     url = BASE_URL + page.url
+#     cached_page = Path(config.ROOT_DIR / "data" / "vmgd" / page.slug)
+#     if not cached_page.exists():
+#         logger.info(f"Fetching {url=}")
+#         # TODO retry httpx.ConnectError
+#         resp = await client.get(url)
+#         if resp.status_code == httpx.codes.OK:
+#             html = resp.text
+#             # _save_html(html, cached_page)
+#             cached_page.write_text(html)
+#             # async with async_session() as db_session:
+#             #     db_session.add(page)
+#         else:
+#             raise VMGDResponseNotOK(resp.text, f"Status not OK for {url=}")
+#     else:
+#         logger.info(f"Fetching page from cache {page.slug=}")
+#         html = cached_page.read_text()
+#     return html
 
 
 async def _fetch_forecast(client: httpx.AsyncClient) -> None:
@@ -99,8 +135,8 @@ async def _fetch_forecast(client: httpx.AsyncClient) -> None:
     The specifics of how to decode the `weathers` array is found in the `xmlForecast.js`
     file that is on the page.
     """
-    page = models.Page(url="/forecast-division")
-    html = await _fetch(client, page)
+    # page = models.Page(url=)
+    html = await fetch_page(client, page)
     page.fetched_at = now()
     soup = BeautifulSoup(html, "html.parser")
 
@@ -151,12 +187,12 @@ async def _fetch_public_forecast(client: httpx.AsyncClient) -> None:
     reported in other forecast pages.
     """
     url = "/forecast-division/public-forecast"
-    html = await _fetch(client, url)
+    html = await fetch_page(client, url)
 
 
 async def _fetch_public_forecast_policy(client: httpx.AsyncClient) -> None:
     url = "/forecast-division/public-forecast/forecast-policy"
-    html = await _fetch(client, url)
+    html = await fetch_page(client, url)
     # TODO hash text contents of `<table class="forecastPublic">` to make a sanity
     # check that data presented or how data is processed is not changed. Only store
     # copies of the page that show a new hash value... I think. But maybe this is
@@ -165,7 +201,7 @@ async def _fetch_public_forecast_policy(client: httpx.AsyncClient) -> None:
 
 async def _fetch_severe_weather_outlook(client: httpx.AsyncClient) -> None:
     url = "/forecast-division/public-forecast/severe-weather-outlook"
-    html = await _fetch(client, url)
+    html = await fetch_page(client, url)
     soup = BeautifulSoup(html, "html.parser")
     table = soup.find("table", class_="severeTable")
     # TODO assert table
@@ -179,7 +215,7 @@ async def _fetch_severe_weather_outlook(client: httpx.AsyncClient) -> None:
 
 async def _fetch_public_forecast_tc_outlook(client: httpx.AsyncClient) -> None:
     url = "/forecast-division/public-forecast/tc-outlook"
-    html = await _fetch(client, url)
+    html = await fetch_page(client, url)
 
 
 async def _fetch_public_forecast_7_day(client: httpx.AsyncClient) -> None:
@@ -187,7 +223,7 @@ async def _fetch_public_forecast_7_day(client: httpx.AsyncClient) -> None:
     and weather condition summary.
     """
     page = models.Page(url="/forecast-division/public-forecast/7-day")
-    html = await _fetch(client, page)
+    html = await fetch_page(client, page)
     page.fetched_at = now()
     soup = BeautifulSoup(html, "html.parser")
     
@@ -235,7 +271,7 @@ async def _fetch_public_forecast_7_day(client: httpx.AsyncClient) -> None:
 
 async def _fetch_public_forecast_media(client: httpx.AsyncClient) -> None:
     url = "/forecast-division/public-forecast/media"
-    html = await _fetch(client, url)
+    html = await fetch_page(client, url)
     # TODO extract data from `<table class="forecastPublic">` and download encoded `.png` file in `img` tag.
 
 
@@ -245,7 +281,7 @@ async def _fetch_public_forecast_media(client: httpx.AsyncClient) -> None:
 
 async def _fetch_current_bulletin(client: httpx.AsyncClient) -> None:
     url = "/forecast-division/warnings/current-bulletin"
-    html = await _fetch(client, url)
+    html = await fetch_page(client, url)
     soup = BeautifulSoup(html, "html.parser")
     warning_div = soup.find("div", class_="foreWarning")
     if warning_div.text.lower().strip() == "there is no latest warning":
@@ -258,17 +294,82 @@ async def _fetch_current_bulletin(client: httpx.AsyncClient) -> None:
 
 async def _fetch_severe_weather_warning(client: httpx.AsyncClient) -> None:
     url = "/forecast-division/warnings/severe-weather-warning"
-    html = await _fetch(client, url)
+    html = await fetch_page(client, url)
     # TODO extract data from table with class `marineFrontTabOne`
 
 
 async def _fetch_marine_waring(client: httpx.AsyncClient) -> None:
     url = "/forecast-division/warnings/marine-warning"
-    html = await _fetch(client, url)
+    html = await fetch_page(client, url)
     # TODO extract data from table with class `marineFrontTabOne`
 
 
 async def _fetch_hight_seas_warning(client: httpx.AsyncClient) -> None:
     url = "/forecast-division/warnings/hight-seas-warning"
-    html = await _fetch(client, url)
+    html = await fetch_page(client, url)
     # TODO extract data from `<article class="item-page">` and handle no warnings by text `NO CURRENT WARNING`
+
+
+@dataclass
+class PageToFetch:
+    relative_url: str
+    process: callable
+
+    @property
+    def url(self):
+        return BASE_URL + self.relative_url
+
+    @property
+    def slug(self):
+        return self.relative_url.rsplit("/", 1)[1]
+
+# TODO complete URLs here
+# TODO rewrite each function to handle the html and not to fetch the url
+# TODO rename the functions that process the html since we are not fetching the data within these functions
+pages_to_fetch = [
+    PageToFetch("/forecast-division", _fetch_forecast),
+    PageToFetch("/forecast-division/public-forecast", _fetch_public_forecast),
+    PageToFetch("/forecast-division/public-forecast/forecast-policy", _fetch_public_forecast_policy),
+    PageToFetch("/forecast-division/public-forecast/severe-weather-outlook", _fetch_severe_weather_outlook),
+    PageToFetch("/forecast-division/public-forecast/tc-outlook", _fetch_public_forecast_tc_outlook),
+    PageToFetch("", _fetch_public_forecast_7_day),
+    PageToFetch("", _fetch_public_forecast_media),
+    PageToFetch("", _fetch_current_bulletin),
+    PageToFetch("", _fetch_severe_weather_warning),
+    PageToFetch("", _fetch_marine_waring),
+    PageToFetch("", _fetch_hight_seas_warning),
+]
+
+
+async def fetch_page(page: PageToFetch):
+    cached_page = Path(config.ROOT_DIR / "data" / "vmgd" / page.slug)
+    if cached_page.exists():
+        logger.info(f"Fetching page from cache {page.slug=}")
+        html = cached_page.read_text()
+    else:
+        html = await fetch(page.url)
+        cached_page.write_text(html)
+    return html
+
+
+async def process_pages(page: PageToFetch):
+    # TODO add client to `fetch_page` for httpx.AsyncClient - or not and forego slight benefits
+    html = await fetch_page(page.url)
+    data = await page.process(html)
+    # TODO handle the page data (ex. save to database page table)
+
+
+async def fetch_all_pages(db_session) -> None:
+    pass
+
+
+async def run_fetch_all_pages() -> None:
+    """CLI entrypoint."""
+    # TODO
+    headers = {
+        "User-Agent": config.USER_AGENT,
+    }
+    async with httpx.AsyncClient(headers=headers, timeout=30.0) as client:
+        async with anyio.create_task_group() as tg:
+            for ptf in pages_to_fetch:
+                tg.start_soon(process_page(ptf))
