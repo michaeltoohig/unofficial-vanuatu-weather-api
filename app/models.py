@@ -1,5 +1,7 @@
+from datetime import datetime
 import json
 from pathlib import Path
+from typing import Any
 
 from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
@@ -29,18 +31,23 @@ class Page(Base):
     issued_at = Column(DateTime(timezone=True), nullable=False)
 
     url = Column(String, nullable=False)
-    _json_data = Column("json_data", String, nullable=False)
+    _raw_data = Column("json_data", String, nullable=False)
 
-    def __init__(self, url: str):
+    def __init__(self, url: str, issued_at: datetime, raw_data: Any, fetched_at: datetime | None = None):
+        if fetched_at is None:
+            fetched_at = now()        
         self.url = url
+        self.issued_at = issued_at
+        self.raw_data = raw_data
+        self.fetched_at = fetched_at
 
     @property
-    def json_data(self):
-        return json.loads(self._json_data)
+    def raw_data(self):
+        return json.loads(self._raw_data)
     
-    @json_data.setter
-    def json_data(self, data):
-        self._json_data = json.dumps(data)
+    @raw_data.setter
+    def raw_data(self, data):
+        self._raw_data = json.dumps(data)
 
 
 class PageError(Base):
@@ -50,8 +57,17 @@ class PageError(Base):
     created_at = Column(DateTime(timezone=True), nullable=False, default=now)
 
     url = Column(String, nullable=False)
-    _file = Column("file", String, nullable=False)  # relative path or filename of html file that caused the error
     description = Column(String, nullable=False)
+    _file = Column("file", String, nullable=False)  # relative path or filename of html file that caused the error
+    _raw_data = Column("json_data", String)
+    errors = Column(String)
+
+    def __init__(self, url: str, description: str, file: Path, raw_data: Any | None = None, errors: Any | None = None):
+        self.url = url
+        self.description = description
+        self.file = file
+        self.raw_data = raw_data
+        self.errors = errors
 
     @property
     def file(self):

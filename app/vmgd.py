@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from datetime import datetime, time, timedelta, timezone
+from datetime import datetime
+import enum
 import json
 from pathlib import Path
 from typing import Any
@@ -7,12 +8,12 @@ import uuid
 
 import anyio
 from bs4 import BeautifulSoup
-from cerberus_list_schema import Validator
+from cerberus import Validator
 import httpx
 from loguru import logger
 
 from app import config, models
-from app.database import async_session
+from app.database import AsyncSession, async_session
 from app.pages import process_issued_at
 from app.utils.datetime import now
 
@@ -21,25 +22,29 @@ BASE_URL = "https://www.vmgd.gov.vu/vmgd/index.php"
 ProcessResult = tuple[datetime, Any]
 
 
-def _save_html(html: str, fp: Path):
-    vmgd_directory = Path(config.ROOT_DIR / "data" / "vmgd")
+def _save_html(html: str, fp: Path) -> Path:
+    vmgd_directory = Path(config.ROOT_DIR) / "data" / "vmgd"
     if fp.is_absolute():
         if not fp.is_relative_to(vmgd_directory):
             raise Exception(f"Bad path for saving html {fp}")
     else:
         fp = vmgd_directory / fp
+        if not fp.parent.exists():
+            fp.parent.mkdir(parents=True)
     fp.write_text(html)
+    return fp
 
 
 class FetchError(Exception):
     def __init__(self, url: str, resp: httpx.Response | None = None) -> None:
         resp_part = ""
         if resp:
-            fp = Path("errors" / str(uuid.uuid4()))
-            _save_html(resp.text, fp)
-            resp_part = f", got HTTP {resp.status_code}, review HTML at {str(fp)}"
+            filename = Path("errors") / str(uuid.uuid4())
+            filepath = _save_html(resp.text, filename)
+            resp_part = f", got HTTP {resp.status_code}, review HTML at {str(filename)}"
         message = f"Failed to fetch {url}{resp_part}"
         super().__init__(message)
+        self.html = filepath
         self.resp = resp
         self.url = url
 
@@ -54,14 +59,14 @@ class PageNotFoundError(FetchError):
 
 class ScrapingError(Exception):
     def __init__(self, html: str, data: Any | None = None, validation_errors: Any | None = None) -> None:
-        fp = Path("errors" / str(uuid.uuid4()))
-        _save_html(html, fp)
+        filename = Path("errors") / str(uuid.uuid4())
+        filepath = _save_html(html, filename)
         errors_part = ""
         if validation_errors:
             errors_part = f", got schema validation errors"
-        message = f"Failed to scrape page, review HTML at {str(fp)}{errors_part}"
+        message = f"Failed to scrape page, review HTML at {str(filename)}{errors_part}"
         super().__init__(message)
-        self.html = fp
+        self.html = filepath
         self.data = data
         self.validation_errors = validation_errors
 
@@ -76,6 +81,18 @@ class ScrapingValidationError(ScrapingError):
 
 class ScrapingIssuedAtError(ScrapingError):
     pass
+
+
+class PageErrorTypeEnum(str, enum.Enum):
+    TIMEOUT = "TIMEOUT"
+    NOT_FOUND = "NOT_FOUND"
+    UNAUHTORIZED = "UNAUTHORIZED"
+
+    DATA_NOT_FOUND = "DATA_NOT_FOUND"
+    DATA_NOT_VALID = "DATA_NOT_VALID"
+    ISSUED_NOT_FOUND = "ISSUED_NOT_FOUND"
+
+    INTERNAL_ERROR = "INTERNAL_ERROR"
 
 
 async def fetch(url: str) -> str:
@@ -255,36 +272,62 @@ async def process_public_forecast_tc_outlook(html: str) -> ProcessResult:
     raise NotImplementedError
 
 
+process_public_forecast_7_day_schema = {
+    "forecasts": {
+        "type": "list",
+        "schema": {
+            "type": "dict",
+            "schema": {
+                "location": {"type": "string", "empty": False},
+                "date": {"type": "string", "empty": False},
+                "summary": {"type": "string"},
+                "minTemp": {"type": "integer", "coerce": int, "min": 0, "max": 50},
+                "maxTemp": {"type": "integer", "coerce": int, "min": 0, "max": 50},
+            }
+        }
+    }
+}
+
+
 async def process_public_forecast_7_day(html: str) -> ProcessResult:
     """Simple weekly forecast for all locations containing daily low/high temperature,
     and weather condition summary.
     """
+    forecasts = []
     soup = BeautifulSoup(html, "html.parser")
     # grab data for each location from individual tables
-    forecast_week = []
-    for table in soup.article.find_all("table"):
-        for count, tr in enumerate(table.find_all("tr")):
-            if count == 0:
-                location = tr.text.strip()
-                continue
-            date, forecast = tr.text.strip().split(" : ")
-            summary = forecast.split(".", 1)[0]
-            minTemp = forecast.split("Min:", 1)[1].split("&", 1)[0].strip()
-            maxTemp = forecast.split("Max:", 1)[1].split("&", 1)[0].strip()
-            forecast_week.append(
-                dict(
-                    location=location,
-                    date=date,
-                    summary=summary,
-                    minTemp=minTemp,
-                    maxTemp=maxTemp,
+    try:
+        for table in soup.article.find_all("table"):
+            for count, tr in enumerate(table.find_all("tr")):
+                if count == 0:
+                    location = tr.text.strip()
+                    continue
+                date, forecast = tr.text.strip().split(" : ")
+                summary = forecast.split(".", 1)[0]
+                minTemp = int(forecast.split("Min:", 1)[1].split("&", 1)[0].strip())
+                maxTemp = int(forecast.split("Max:", 1)[1].split("&", 1)[0].strip())
+                forecasts.append(
+                    dict(
+                        location=location,
+                        date=date,
+                        summary=summary,
+                        minTemp=minTemp,
+                        maxTemp=maxTemp,
+                    )
                 )
-            )
+        v = Validator(process_public_forecast_7_day_schema)
+        if not v.validate(dict(forecasts=forecasts)):
+            raise ScrapingValidationError(html, forecasts, v.errors)
+    except Exception as exc:
+        raise ScrapingNotFoundError(html)
 
     # grab issued at datetime
-    issued_str = soup.article.find("table").find_previous_sibling("strong").text.lower()
-    issued_at = process_issued_at(issued_str, "Port Vila at")
-    return issued_at, forecast_week
+    try:
+        issued_str = soup.article.find("table").find_previous_sibling("strong").text.lower()
+        issued_at = process_issued_at(issued_str, "Port Vila at")
+    except (IndexError, ValueError) as exc:
+        raise ScrapingIssuedAtError(html)
+    return issued_at, forecasts
 
 
 async def process_public_forecast_media(html: str) -> ProcessResult:
@@ -384,20 +427,40 @@ async def fetch_page(page: PageToFetch):
     return html
 
 
-async def process_page(page_to_fetch: PageToFetch):
-    # TODO add client to `fetch_page` for httpx.AsyncClient - or not and forego slight benefits
-    html = await fetch_page(page_to_fetch)
+async def process_page(db_session: AsyncSession, ptf: PageToFetch):
+    error = None
+    fetched_at = now()
     try:
-        issued_at, data = await page_to_fetch.process(html)
-    except ScrapingNotFoundError:
-        pass
-    except ScrapingValidationError:
-        pass
+        html = await fetch_page(ptf)
+    except httpx.TimeoutException:
+        error = PageErrorTypeEnum.TIMEOUT
+    except PageUnavailableError:
+        error = PageErrorTypeEnum.UNAUHTORIZED
+    except PageNotFoundError:
+        error = PageErrorTypeEnum.NOT_FOUND
     except Exception as exc:
+        logger.exception("Unexpected error fetching page: %s", str(exc))
+        error = PageErrorTypeEnum.INTERNAL_ERROR
+        page_error = models.PageError(url=ptf.url, description=str(e), file=e.html)
+        db_session.add(page_error)
+        return
+        try:
+            issued_at, data = await ptf.process(html)
+        except ScrapingNotFoundError:
+            error = PageErrorTypeEnum.DATA_NOT_FOUND
+        except ScrapingValidationError:
+            error = PageErrorTypeEnum.DATA_NOT_VALID
+        except ScrapingIssuedAtError:
+            error = PageErrorTypeEnum.ISSUED_NOT_FOUND
+        except Exception as exc:
+            logger.exception("Unexpected error processing page: %s", str(exc))
+            error = PageErrorTypeEnum.INTERNAL_ERROR
+        else:
+            page = models.Page(url=ptf.url, issued_at=issued_at, raw_data=data, fetched_at=fetched_at)
+            db_session.add(page)
+    if error:
+        page_error = models.PageError(url=ptf.url, description=error, file=Path("errors/test"))  # TODO get file from exception
         pass
-    print(issued_at)
-    # TODO handle the page data (ex. save to database page table)
-
 
 async def process_all_pages(db_session) -> None:
     pass
@@ -405,11 +468,15 @@ async def process_all_pages(db_session) -> None:
 
 async def run_process_all_pages() -> None:
     """CLI entrypoint."""
-    # TODO
-    headers = {
-        "User-Agent": config.USER_AGENT,
-    }
-    async with httpx.AsyncClient(headers=headers, timeout=30.0) as client:
+    # headers = {
+    #     "User-Agent": config.USER_AGENT,
+    # }
+    # async with httpx.AsyncClient(headers=headers, timeout=30.0) as client:
+    #     async with anyio.create_task_group() as tg:
+    #         for ptf in pages_to_fetch:
+    #             tg.start_soon(process_page, ptf)
+
+    async with async_session() as db_session:
         async with anyio.create_task_group() as tg:
             for ptf in pages_to_fetch:
-                tg.start_soon(process_page, ptf)
+                tg.start_soon(process_page, db_session, ptf)
