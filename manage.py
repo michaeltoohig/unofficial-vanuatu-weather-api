@@ -37,9 +37,9 @@ def dev():
 
 @cli.command()
 def fetch_data():
-    from app.vmgd import run_fetch_all_pages
+    from app.vmgd import run_process_all_pages
 
-    anyio.run(run_fetch_all_pages)
+    anyio.run(run_process_all_pages)
 
 
 if __name__ == "__main__":
