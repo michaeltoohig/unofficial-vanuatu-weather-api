@@ -64,7 +64,7 @@ class PageError(Base):
 
     def __init__(self, url: str, description: str, html_filepath: Path, raw_data: Any | None = None, errors: Any | None = None):
         self.url = url
-        self.description = description
+        self._description = description
         self.file = html_filepath
         self.raw_data = raw_data
         self.errors = errors

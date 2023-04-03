@@ -36,7 +36,7 @@ def dev():
     
 
 @cli.command()
-def fetch_data():
+def scrape():
     from app.vmgd import run_process_all_pages
 
     anyio.run(run_process_all_pages)
