@@ -16,6 +16,8 @@ To watch changes to scss files:
 
 ## TODO
 
+High-level steps
+
 - [ ] create models
 - [ ] add commands which populate database
 - [ ] create API endpoints

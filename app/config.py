@@ -30,7 +30,7 @@ except FileNotFoundError:
 class Config(BaseModel):
     domain: str = "localhost:8000"
     https: bool = False
-    debug: bool = False
+    debug: bool = True
     sqlalchemy_database: str | None = None
 
 

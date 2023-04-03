@@ -57,15 +57,15 @@ class PageError(Base):
     created_at = Column(DateTime(timezone=True), nullable=False, default=now)
 
     url = Column(String, nullable=False)
-    description = Column(String, nullable=False)
+    _description = Column("description", String, nullable=False)
     _file = Column("file", String, nullable=False)  # relative path or filename of html file that caused the error
     _raw_data = Column("json_data", String)
     errors = Column(String)
 
-    def __init__(self, url: str, description: str, file: Path, raw_data: Any | None = None, errors: Any | None = None):
+    def __init__(self, url: str, description: str, html_filepath: Path, raw_data: Any | None = None, errors: Any | None = None):
         self.url = url
         self.description = description
-        self.file = file
+        self.file = html_filepath
         self.raw_data = raw_data
         self.errors = errors
 
@@ -77,6 +77,14 @@ class PageError(Base):
     def file(self, fp: Path):
         assert fp.relative_to(Path(ROOT_DIR / "data" / "vmgd" / "errors"))
         self._file = fp.name
+
+    @property
+    def raw_data(self):
+        return json.loads(self._raw_data)
+    
+    @raw_data.setter
+    def raw_data(self, data):
+        self._raw_data = json.dumps(data)
 
 
 # class Forecast(Base):

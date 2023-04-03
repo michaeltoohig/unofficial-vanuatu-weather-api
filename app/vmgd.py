@@ -44,7 +44,7 @@ class FetchError(Exception):
             resp_part = f", got HTTP {resp.status_code}, review HTML at {str(filename)}"
         message = f"Failed to fetch {url}{resp_part}"
         super().__init__(message)
-        self.html = filepath
+        self.html_filepath = filepath
         self.resp = resp
         self.url = url
 
@@ -58,17 +58,17 @@ class PageNotFoundError(FetchError):
 
 
 class ScrapingError(Exception):
-    def __init__(self, html: str, data: Any | None = None, validation_errors: Any | None = None) -> None:
+    def __init__(self, html: str, raw_data: Any | None = None, errors: Any | None = None) -> None:
         filename = Path("errors") / str(uuid.uuid4())
         filepath = _save_html(html, filename)
         errors_part = ""
-        if validation_errors:
+        if errors:
             errors_part = f", got schema validation errors"
         message = f"Failed to scrape page, review HTML at {str(filename)}{errors_part}"
         super().__init__(message)
-        self.html = filepath
-        self.data = data
-        self.validation_errors = validation_errors
+        self.html_filepath = filepath
+        self.raw_data = raw_data
+        self.errors = errors
 
 
 class ScrapingNotFoundError(ScrapingError):
@@ -380,7 +380,6 @@ class PageToFetch:
         return self.relative_url.rsplit("/", 1)[1]
 
 
-# TODO rename the functions that process the html since we are not fetching the data within these functions
 pages_to_fetch = [
     PageToFetch("/forecast-division", process_forecast),
     # PageToFetch("/forecast-division/public-forecast", process_public_forecast),
@@ -416,51 +415,88 @@ pages_to_fetch = [
 ]
 
 
-async def fetch_page(page: PageToFetch):
-    cached_page = Path(config.ROOT_DIR / "data" / "vmgd" / page.slug)
-    if cached_page.exists():
+def check_cache(page: PageToFetch) -> str | None:
+    # caching is for development only 
+    html = None
+    cache_file = Path(config.ROOT_DIR / "data" / "vmgd" / page.slug)
+    if cache_file.exists():
         logger.info(f"Fetching page from cache {page.slug=}")
-        html = cached_page.read_text()
-    else:
-        html = await fetch(page.url)
-        cached_page.write_text(html)
+        html = cache_file.read_text()
+    return html, cache_file
+
+
+async def fetch_page(page: PageToFetch):
+    cache_file = None
+    if config.DEBUG:
+        html, cache_file = check_cache(page)
+        if html:
+            return html
+
+    html = await fetch(page.url)
+
+    if config.DEBUG:
+        cache_file.write_text(html)
     return html
 
 
 async def process_page(db_session: AsyncSession, ptf: PageToFetch):
     error = None
-    fetched_at = now()
+
+    # grab the HTML
     try:
+        fetched_at = now()
         html = await fetch_page(ptf)
     except httpx.TimeoutException:
-        error = PageErrorTypeEnum.TIMEOUT
-    except PageUnavailableError:
-        error = PageErrorTypeEnum.UNAUHTORIZED
+        error = (PageErrorTypeEnum.TIMEOUT, None)
+    except PageUnavailableError as e:
+        error = (PageErrorTypeEnum.UNAUHTORIZED, e)
     except PageNotFoundError:
-        error = PageErrorTypeEnum.NOT_FOUND
+        error = (PageErrorTypeEnum.NOT_FOUND, e)
     except Exception as exc:
         logger.exception("Unexpected error fetching page: %s", str(exc))
-        error = PageErrorTypeEnum.INTERNAL_ERROR
-        page_error = models.PageError(url=ptf.url, description=str(e), file=e.html)
-        db_session.add(page_error)
-        return
-        try:
-            issued_at, data = await ptf.process(html)
-        except ScrapingNotFoundError:
-            error = PageErrorTypeEnum.DATA_NOT_FOUND
-        except ScrapingValidationError:
-            error = PageErrorTypeEnum.DATA_NOT_VALID
-        except ScrapingIssuedAtError:
-            error = PageErrorTypeEnum.ISSUED_NOT_FOUND
-        except Exception as exc:
-            logger.exception("Unexpected error processing page: %s", str(exc))
-            error = PageErrorTypeEnum.INTERNAL_ERROR
-        else:
-            page = models.Page(url=ptf.url, issued_at=issued_at, raw_data=data, fetched_at=fetched_at)
-            db_session.add(page)
+        error = (PageErrorTypeEnum.INTERNAL_ERROR, None)
+
     if error:
-        page_error = models.PageError(url=ptf.url, description=error, file=Path("errors/test"))  # TODO get file from exception
-        pass
+        error_type, exc = error
+        fp = exc.html_filepath if exc is not None else None
+        page_error = models.PageError(
+            url=ptf.url,
+            description=error_type.value,
+            html_filepath=fp,
+        )
+        db_session.add(page_error)
+        return False
+
+    # process the HTML
+    try:
+        issued_at, data = await ptf.process(html)
+    except ScrapingNotFoundError as e:
+        error = (PageErrorTypeEnum.DATA_NOT_FOUND, e)
+    except ScrapingValidationError as e:
+        error = (PageErrorTypeEnum.DATA_NOT_VALID, e)
+    except ScrapingIssuedAtError as e:
+        error = (PageErrorTypeEnum.ISSUED_NOT_FOUND, 3)
+    except Exception as exc:
+        logger.exception("Unexpected error processing page: %s", str(exc))
+        error = (PageErrorTypeEnum.INTERNAL_ERROR, None)
+        return False
+    
+    if error:
+        error_type, exc = error
+        page_error = models.PageError(
+            url=ptf.url,
+            description=error_type.value,
+            html_filepath=getattr(exc, "html_filepath", None),
+            raw_data=getattr(exc, "raw_data", None),
+            errors=getattr(exc, "errors", None),
+        )
+        db_session.add(page_error)
+        return False
+    
+    page = models.Page(url=ptf.url, issued_at=issued_at, raw_data=data, fetched_at=fetched_at)
+    db_session.add(page)
+    return True
+
 
 async def process_all_pages(db_session) -> None:
     pass
@@ -480,3 +516,4 @@ async def run_process_all_pages() -> None:
         async with anyio.create_task_group() as tg:
             for ptf in pages_to_fetch:
                 tg.start_soon(process_page, db_session, ptf)
+    await db_session.commit()
