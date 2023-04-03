@@ -1,9 +1,12 @@
 """Actions related to the VMGD pages."""
 from datetime import datetime, timedelta, timezone
+import json
+from pathlib import Path
+import uuid
 from sqlalchemy import select 
 # from sqlalchemy.orm import joinedload
 
-from app import models
+from app import config, models
 from app.database import AsyncSession
 
 
@@ -37,3 +40,41 @@ async def get_latest_page(
         )
         .scalar()
     )
+
+
+def _save_html(html: str, fp: Path) -> Path:
+    vmgd_directory = Path(config.ROOT_DIR) / "data" / "vmgd"
+    if fp.is_absolute():
+        if not fp.is_relative_to(vmgd_directory):
+            raise Exception(f"Bad path for saving html {fp}")
+    else:
+        fp = vmgd_directory / fp
+        if not fp.parent.exists():
+            fp.parent.mkdir(parents=True)
+    fp.write_text(html)
+    return fp
+
+
+async def handle_page_error(
+    db_session: AsyncSession,
+    html,
+    raw_data,
+    errors,
+) -> models.PageError | None:
+    # TODO should probably take the exc which contains the values we need
+    """make error hash and return page error existing that matches"""
+    existing = (
+        await db_session.execute(
+            select(models.PageError)
+            .where(
+                models.PageError._raw_data == json.dumps(raw_data),
+                models.PageError.errors == json.dumps(errors),
+            )
+        )
+    )
+    if existing:
+        pass  # TODO increment count on row
+    else:
+        pass  # save_html, hash html contents, save page error
+    # filename = Path("errors") / str(uuid.uuid4())
+    # filepath = _save_html(html, filename)

@@ -59,13 +59,18 @@ class PageError(Base):
     url = Column(String, nullable=False)
     _description = Column("description", String, nullable=False)
     _file = Column("file", String, nullable=False)  # relative path or filename of html file that caused the error
+    html_file = Column(String, nullable=False)  # relative path to HTML file
+    html_hash = Column(String, nullable=False)
     _raw_data = Column("json_data", String)
     errors = Column(String)
+    count = Column(Integer, default=1)
 
-    def __init__(self, url: str, description: str, html_filepath: Path, raw_data: Any | None = None, errors: Any | None = None):
+    def __init__(self, url: str, description: str, html_hash: str, html_filepath: Path, raw_data: Any | None = None, errors: Any | None = None):
         self.url = url
         self._description = description
-        self.file = html_filepath
+        self.file = html_filepath  # TODO deprecate
+        self.html_file = html_filepath
+        self.html_hash = html_hash
         self.raw_data = raw_data
         self.errors = errors
 

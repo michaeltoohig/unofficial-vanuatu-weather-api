@@ -62,14 +62,14 @@ class ScrapingError(Exception):
     def __init__(
         self, html: str, raw_data: Any | None = None, errors: Any | None = None
     ) -> None:
-        filename = Path("errors") / str(uuid.uuid4())
-        filepath = _save_html(html, filename)
+        # filename = Path("errors") / str(uuid.uuid4())
+        # filepath = _save_html(html, filename)
         errors_part = ""
         if errors:
             errors_part = f", got schema validation errors"
-        message = f"Failed to scrape page, review HTML at {str(filename)}{errors_part}"
+        message = f"Failed to scrape page{errors_part}"
         super().__init__(message)
-        self.html_filepath = filepath
+        self.html = html
         self.raw_data = raw_data
         self.errors = errors
 
@@ -496,6 +496,7 @@ async def process_page(db_session: AsyncSession, ptf: PageToFetch):
 
         if error:
             error_type, exc = error
+            existing = await 
             page_error = models.PageError(
                 url=ptf.url,
                 description=error_type.value,
