@@ -25,7 +25,6 @@ from app.database import AsyncSession, async_session, get_db_session
 from app.pages import get_latest_page
 
 
-
 class CustomMiddleware:
     """Raw ASGI middleware as using starlette base middleware causes issues
     with both:
@@ -53,7 +52,6 @@ class CustomMiddleware:
 
         async def send_wrapper(message: Message) -> None:
             if message["type"] == "http.response.start":
-
                 # Extract the HTTP response status code
                 response_details["status_code"] = message["status"]
 
@@ -112,7 +110,7 @@ class CustomMiddleware:
         return None
 
 
-app = FastAPI() #docs_url=None, redoc_url=None)
+app = FastAPI()  # docs_url=None, redoc_url=None)
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 

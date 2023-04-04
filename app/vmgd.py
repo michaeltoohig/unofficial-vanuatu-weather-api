@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 import enum
 import json
 from pathlib import Path
@@ -15,8 +15,8 @@ from loguru import logger
 
 from app import config, models
 from app.database import AsyncSession, async_session
-from app.pages import process_issued_at
-from app.utils.datetime import now
+from app.pages import get_latest_page, handle_page_error, process_issued_at
+from app.utils.datetime import as_utc, now
 
 
 BASE_URL = "https://www.vmgd.gov.vu/vmgd/index.php"
@@ -325,10 +325,12 @@ async def process_public_forecast_7_day(html: str) -> ProcessResult:
         if errors:
             raise ScrapingValidationError(html, forecasts, errors)
     except SchemaError as exc:
+        print(1)
         raise ScrapingValidationError(html, forecasts, str(exc))
-    except Exception as exc:
-        logger.exception("Failed to grab data: %s", str(exc))
-        raise ScrapingNotFoundError(html)
+    # except Exception as exc:
+    #     print(2, str(exc))
+    #     logger.exception("Failed to grab data: %s" % str(exc))
+    #     raise ScrapingNotFoundError(html)
 
     # grab issued at datetime
     try:
@@ -454,6 +456,11 @@ async def process_page(db_session: AsyncSession, ptf: PageToFetch):
     error = None
 
     async with async_session() as db_session:
+        latest_page = await get_latest_page(db_session, ptf.url)
+        if latest_page and as_utc(latest_page.fetched_at) < now() + timedelta(minutes=30):
+            logger.info("Skipping page as it has recently been fetched successfully.")
+            return
+
         # grab the HTML
         try:
             fetched_at = now()
@@ -470,14 +477,14 @@ async def process_page(db_session: AsyncSession, ptf: PageToFetch):
 
         if error:
             error_type, exc = error
-            fp = exc.html_filepath if exc is not None else None
-            page_error = models.PageError(
+            await handle_page_error(
+                db_session,
                 url=ptf.url,
                 description=error_type.value,
-                html_filepath=fp,
+                html=getattr(exc, "html", None),
+                raw_data=getattr(exc, "raw_data", None),
+                errors=getattr(exc, "errors", None),
             )
-            db_session.add(page_error)
-            await db_session.commit()
             return False
 
         # process the HTML
@@ -496,16 +503,14 @@ async def process_page(db_session: AsyncSession, ptf: PageToFetch):
 
         if error:
             error_type, exc = error
-            existing = await 
-            page_error = models.PageError(
+            await handle_page_error(
+                db_session,
                 url=ptf.url,
                 description=error_type.value,
-                html_filepath=getattr(exc, "html_filepath", None),
+                html=getattr(exc, "html", None),
                 raw_data=getattr(exc, "raw_data", None),
                 errors=getattr(exc, "errors", None),
             )
-            db_session.add(page_error)
-            await db_session.commit()
             return False
 
         page = models.Page(

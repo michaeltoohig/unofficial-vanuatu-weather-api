@@ -15,6 +15,7 @@ _templates = Jinja2Templates(
     lstrip_blocks=True,
 )
 
+
 async def render_template(
     db_session: AsyncSession,
     request: Request,

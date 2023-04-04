@@ -1,8 +1,8 @@
 """Page
 
-Revision ID: 04b1040f228b
+Revision ID: 86ec5d272f00
 Revises: 5e58e9557435
-Create Date: 2023-04-03 20:50:10.254954
+Create Date: 2023-04-04 19:47:24.642092
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '04b1040f228b'
+revision = '86ec5d272f00'
 down_revision = '5e58e9557435'
 branch_labels = None
 depends_on = None
@@ -32,9 +32,10 @@ def upgrade() -> None:
     op.create_table('page_error',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('url', sa.String(), nullable=False),
     sa.Column('description', sa.String(), nullable=False),
-    sa.Column('file', sa.String(), nullable=False),
+    sa.Column('html_hash', sa.String(), nullable=False),
     sa.Column('json_data', sa.String(), nullable=True),
     sa.Column('errors', sa.String(), nullable=True),
     sa.Column('count', sa.Integer(), nullable=True),

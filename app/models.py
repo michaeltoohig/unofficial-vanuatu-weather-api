@@ -25,7 +25,7 @@ class Location(Base):
 
 class Page(Base):
     __tablename__ = "page"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     fetched_at = Column(DateTime(timezone=True), nullable=False)
     issued_at = Column(DateTime(timezone=True), nullable=False)
@@ -33,9 +33,15 @@ class Page(Base):
     url = Column(String, nullable=False)
     _raw_data = Column("json_data", String, nullable=False)
 
-    def __init__(self, url: str, issued_at: datetime, raw_data: Any, fetched_at: datetime | None = None):
+    def __init__(
+        self,
+        url: str,
+        issued_at: datetime,
+        raw_data: Any,
+        fetched_at: datetime | None = None,
+    ):
         if fetched_at is None:
-            fetched_at = now()        
+            fetched_at = now()
         self.url = url
         self.issued_at = issued_at
         self.raw_data = raw_data
@@ -44,7 +50,7 @@ class Page(Base):
     @property
     def raw_data(self):
         return json.loads(self._raw_data)
-    
+
     @raw_data.setter
     def raw_data(self, data):
         self._raw_data = json.dumps(data)
@@ -55,41 +61,52 @@ class PageError(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=now)
+    updated_at = Column(DateTime(timezone=True))
 
     url = Column(String, nullable=False)
     _description = Column("description", String, nullable=False)
-    _file = Column("file", String, nullable=False)  # relative path or filename of html file that caused the error
-    html_file = Column(String, nullable=False)  # relative path to HTML file
     html_hash = Column(String, nullable=False)
     _raw_data = Column("json_data", String)
-    errors = Column(String)
+    _errors = Column("errors", String)
     count = Column(Integer, default=1)
 
-    def __init__(self, url: str, description: str, html_hash: str, html_filepath: Path, raw_data: Any | None = None, errors: Any | None = None):
+    def __init__(
+        self,
+        url: str,
+        description: str,
+        html_hash: str,
+        raw_data: Any | None = None,
+        errors: Any | None = None,
+    ):
         self.url = url
         self._description = description
-        self.file = html_filepath  # TODO deprecate
-        self.html_file = html_filepath
         self.html_hash = html_hash
         self.raw_data = raw_data
         self.errors = errors
 
-    @property
-    def file(self):
-        return Path(ROOT_DIR / "data" / "vmgd" / "errors", self._file)
+    @staticmethod
+    def get_html_directory() -> Path:
+        return Path(ROOT_DIR / "data" / "vmgd" / "errors")
 
-    @file.setter
-    def file(self, fp: Path):
-        assert fp.relative_to(Path(ROOT_DIR / "data" / "vmgd" / "errors"))
-        self._file = fp.name
+    @property
+    def html_file(self):
+        return self.get_html_directory() / self._file
 
     @property
     def raw_data(self):
         return json.loads(self._raw_data)
-    
+
     @raw_data.setter
-    def raw_data(self, data):
-        self._raw_data = json.dumps(data)
+    def raw_data(self, obj):
+        self._raw_data = json.dumps(obj)
+
+    @property
+    def errors(self):
+        return json.loads(self._errors)
+
+    @errors.setter
+    def errors(self, obj):
+        self._errors = json.dumps(obj)
 
 
 # class Forecast(Base):

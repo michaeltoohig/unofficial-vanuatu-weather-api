@@ -27,6 +27,7 @@ try:
 except FileNotFoundError:
     pass
 
+
 class Config(BaseModel):
     domain: str = "localhost:8000"
     https: bool = False
