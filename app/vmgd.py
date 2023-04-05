@@ -120,7 +120,7 @@ async def fetch(url: str) -> str:
     except httpx.HTTPError as http_error:
         raise FetchError(url, resp) from http_error
 
-    return resp.html
+    return resp.text
 
 
 process_forecast_schema = {
@@ -228,9 +228,10 @@ async def process_forecast(html: str) -> ProcessResult:
             raise ScrapingValidationError(html, weathers, errors)
     except SchemaError as exc:
         raise ScrapingValidationError(html, weathers, str(exc))
-    except Exception as exc:
-        logger.exception("Failed to grab data: %s", str(exc))
-        raise ScrapingNotFoundError(html)
+    # I believe catching a general exception here negates the use of raising the error above
+    # except Exception as exc:
+    #     logger.exception("Failed to grab data: %s", str(exc))
+    #     raise ScrapingNotFoundError(html)
 
     # grab issued at datetime
     try:
@@ -325,12 +326,7 @@ async def process_public_forecast_7_day(html: str) -> ProcessResult:
         if errors:
             raise ScrapingValidationError(html, forecasts, errors)
     except SchemaError as exc:
-        print(1)
         raise ScrapingValidationError(html, forecasts, str(exc))
-    # except Exception as exc:
-    #     print(2, str(exc))
-    #     logger.exception("Failed to grab data: %s" % str(exc))
-    #     raise ScrapingNotFoundError(html)
 
     # grab issued at datetime
     try:
@@ -343,9 +339,35 @@ async def process_public_forecast_7_day(html: str) -> ProcessResult:
     return issued_at, forecasts
 
 
+public_forecast_media_schema = {
+    "type": "list",
+    "items": [
+        {"type": "string"},
+        {"type": "string"},
+        {"type": "string"},
+    ],
+}
+
+
 async def process_public_forecast_media(html: str) -> ProcessResult:
-    # TODO extract data from `<table class="forecastPublic">` and download encoded `.png` file in `img` tag.
-    raise NotImplementedError
+    soup = BeautifulSoup(html, "html.parser")
+    # grab public weather 
+    try:
+        table = soup.find("table", class_="forecastPublic")
+        image = table.find("img")
+        assert image is not None, "public forecast media image missing"
+    except:
+        raise ScrapingNotFoundError(html)
+
+    try:
+        texts = [t for t in table.td.text.split("\n\n") if t]
+        v = ListValidator(public_forecast_media_schema)
+        if not v.validate(texts):
+            raise ScrapingValidationError(html, texts, v.errors)
+        issued_str, forecast = texts[-1].split("\n", 1)
+        forecast = " ".join(forecast.split("\n"))
+    except SchemaError as exc:
+        raise ScrapingValidationError(html, texts, str(exc))
 
 
 # Warnings
@@ -411,9 +433,9 @@ pages_to_fetch = [
     PageToFetch(
         "/forecast-division/public-forecast/7-day", process_public_forecast_7_day
     ),
-    # PageToFetch(
-    #     "/forecast-division/public-forecast/media", process_public_forecast_media
-    # ),
+    PageToFetch(
+        "/forecast-division/public-forecast/media", process_public_forecast_media
+    ),
     # PageToFetch(
     #     "/forecast-division/warnings/current-bulletin", process_current_bulletin
     # ),
