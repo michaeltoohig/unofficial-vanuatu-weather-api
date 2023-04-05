@@ -369,6 +369,10 @@ async def process_public_forecast_media(html: str) -> ProcessResult:
     except SchemaError as exc:
         raise ScrapingValidationError(html, texts, str(exc))
 
+    try:
+        issued_at = issued_str
+    except (IndexError, ValueError) as exc:
+        raise ScrapingIssuedAtError(html)
 
 # Warnings
 ##########
