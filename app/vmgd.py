@@ -16,7 +16,7 @@ from loguru import logger
 from app import config, models
 from app.database import AsyncSession, async_session
 from app.pages import get_latest_page, handle_page_error, process_issued_at
-from app.utils.datetime import as_utc, now
+from app.utils.datetime import as_utc, as_vu_to_utc, now
 
 
 BASE_URL = "https://www.vmgd.gov.vu/vmgd/index.php"
@@ -339,40 +339,35 @@ async def process_public_forecast_7_day(html: str) -> ProcessResult:
     return issued_at, forecasts
 
 
-public_forecast_media_schema = {
-    "type": "list",
-    "items": [
-        {"type": "string"},
-        {"type": "string"},
-        {"type": "string"},
-    ],
-}
-
-
 async def process_public_forecast_media(html: str) -> ProcessResult:
     soup = BeautifulSoup(html, "html.parser")
-    # grab public weather 
     try:
         table = soup.find("table", class_="forecastPublic")
-        image = table.find("img")
-        assert image is not None, "public forecast media image missing"
     except:
         raise ScrapingNotFoundError(html)
+    
+    try:
+        images = table.find_all("img")
+        assert len(images) > 0, "public forecast media images missing"
+    except AssertionError as exc:
+        raise ScrapingNotFoundError(html, errors=str(exc))
 
     try:
-        texts = [t for t in table.td.text.split("\n\n") if t]
-        v = ListValidator(public_forecast_media_schema)
-        if not v.validate(texts):
-            raise ScrapingValidationError(html, texts, v.errors)
-        issued_str, forecast = texts[-1].split("\n", 1)
-        forecast = " ".join(forecast.split("\n"))
-    except SchemaError as exc:
-        raise ScrapingValidationError(html, texts, str(exc))
+        summary_list = [t for t in table.div.contents if isinstance(t, str)]
+        summary_list = list(filter(lambda t: bool(t.strip()), summary_list))
+        summary = " ".join(" ".join([t.replace("\t", "").strip() for t in summary_list]).split("\n"))
+    except Exception as exc:  # TODO handle expected errors
+        raise ScrapingValidationError(html, errors=str(exc))
 
     try:
-        issued_at = issued_str
+        issued_str = table.div.find_all("div")[1].text.strip().split(" at ", 1)[1]
+        issued_at = datetime.strptime(issued_str, "%H:%M %p,\xa0%A %B %d %Y")
+        issued_at = as_vu_to_utc(issued_at)
     except (IndexError, ValueError) as exc:
-        raise ScrapingIssuedAtError(html)
+        raise ScrapingIssuedAtError(html, errors=str(exc))
+
+    return issued_at, summary, images
+
 
 # Warnings
 ##########
@@ -409,6 +404,11 @@ async def process_hight_seas_warning(html: str) -> ProcessResult:
 class PageToFetch:
     relative_url: str
     process: callable
+    # process_images: callable | None  # TODO decide how to handle pages that have images.
+    # either a new process step to define for each page
+    # or better yet return an 'images' key with the process results and treat that key special in the `process_page` function
+    # the next level would be to save `PageImage` models as children of the Page model to keep them sorted and to prevent saving duplicate images store image hashes there, etc.
+    # TODO figure it out next time to continue here
 
     @property
     def url(self):

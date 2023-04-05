@@ -1,4 +1,5 @@
 """Actions related to the VMGD pages."""
+import base64
 from datetime import datetime, timedelta, timezone
 import hashlib
 import json
@@ -9,7 +10,7 @@ from loguru import logger
 
 from app import config, models
 from app.database import AsyncSession
-from app.utils.datetime import now
+from app.utils.datetime import as_vu_to_utc, now
 
 
 def process_issued_at(
@@ -33,9 +34,7 @@ def process_issued_at(
         issued_date_str[:6] + issued_date_str[8:]
     )  # remove 'st', 'nd', 'rd', 'th'
     issued_at = datetime.strptime(issued_date_str, "%a %d %B, %Y at %H:%M")
-    tz_vu = timezone(timedelta(hours=11))
-    issued_at = issued_at.replace(tzinfo=tz_vu)
-    return issued_at.astimezone(timezone.utc)
+    return as_vu_to_utc(issued_at)
 
 
 async def get_latest_page(
@@ -52,7 +51,7 @@ async def get_latest_page(
     ).scalar()
 
 
-def _save_html(html: str, fp: Path) -> Path:
+def _save_html(html: str, fp: Path) -> None:
     vmgd_directory = Path(config.ROOT_DIR) / "data" / "vmgd"
     if fp.is_absolute():
         if not fp.is_relative_to(vmgd_directory):
@@ -62,7 +61,12 @@ def _save_html(html: str, fp: Path) -> Path:
         if not fp.parent.exists():
             fp.parent.mkdir(parents=True)
     fp.write_text(html)
-    return fp
+
+
+def _save_image(base64_string: str, fp: Path) -> None:
+    base64_data = base64_string.replace('data:image/png;base64,', '')
+    png_data = base64.b64decode(base64_data)
+    fp.write_bytes(png_data)
 
 
 async def handle_page_error(
