@@ -15,6 +15,7 @@ from loguru import logger
 
 from app import config, models
 from app.database import AsyncSession, async_session
+from app.locations import get_location_by_name, save_forecast_location
 from app.pages import get_latest_page, handle_page_error, process_issued_at
 from app.utils.datetime import as_utc, as_vu_to_utc, now
 
@@ -145,22 +146,22 @@ process_forecast_schema = {
         },
         {
             "type": "list",
-            "name": "minTemperatures",
+            "name": "minTemps",
             "items": [{"type": "integer"} for _ in range(7)],
         },
         {
             "type": "list",
-            "name": "maxTemperatures",
+            "name": "maxTemps",
             "items": [{"type": "integer"} for _ in range(7)],
         },
         {
             "type": "list",
-            "name": "minHumidity",
+            "name": "minHumi",
             "items": [{"type": "integer"} for _ in range(7)],
         },
         {
             "type": "list",
-            "name": "maxHumidity",
+            "name": "maxHumi",
             "items": [{"type": "integer"} for _ in range(7)],
         },
         {
@@ -170,7 +171,7 @@ process_forecast_schema = {
         },
         {
             "type": "list",
-            "name": "windDirections",
+            "name": "windDirs",
             "items": [{"type": "float"} for _ in range(16)],
         },
         {
@@ -418,40 +419,47 @@ class PageToFetch:
     def slug(self):
         return self.relative_url.rsplit("/", 1)[1]
 
+@dataclass
+class PageSet:
+    """Defines a group of `PageToFetch` objects that need to be gathered together to create a coherent end result.
+    For example, both weather forecast and 7 day forecasts must be scraped and joined together to create a uniform 7 day forecast for each day of the week."""
+    pages: list[PageToFetch]
+    process: callable
 
-pages_to_fetch = [
-    PageToFetch("/forecast-division", process_forecast),
-    # PageToFetch("/forecast-division/public-forecast", process_public_forecast),
-    # PageToFetch(
-    #     "/forecast-division/public-forecast/forecast-policy",
-    #     process_public_forecast_policy,
-    # ),
-    # PageToFetch(
-    #     "/forecast-division/public-forecast/severe-weather-outlook",
-    #     process_severe_weather_outlook,
-    # ),
-    # PageToFetch(
-    #     "/forecast-division/public-forecast/tc-outlook",
-    #     process_public_forecast_tc_outlook,
-    # ),
-    PageToFetch(
-        "/forecast-division/public-forecast/7-day", process_public_forecast_7_day
-    ),
-    PageToFetch(
-        "/forecast-division/public-forecast/media", process_public_forecast_media
-    ),
-    # PageToFetch(
-    #     "/forecast-division/warnings/current-bulletin", process_current_bulletin
-    # ),
-    # PageToFetch(
-    #     "/forecast-division/warnings/severe-weather-warning",
-    #     process_severe_weather_warning,
-    # ),
-    # PageToFetch("/forecast-division/warnings/marine-warning", process_marine_waring),
-    # PageToFetch(
-    #     "/forecast-division/warnings/hight-seas-warning", process_hight_seas_warning
-    # ),
-]
+
+# pages_to_fetch = [
+#     PageToFetch("/forecast-division", process_forecast),
+#     # PageToFetch("/forecast-division/public-forecast", process_public_forecast),
+#     # PageToFetch(
+#     #     "/forecast-division/public-forecast/forecast-policy",
+#     #     process_public_forecast_policy,
+#     # ),
+#     # PageToFetch(
+#     #     "/forecast-division/public-forecast/severe-weather-outlook",
+#     #     process_severe_weather_outlook,
+#     # ),
+#     # PageToFetch(
+#     #     "/forecast-division/public-forecast/tc-outlook",
+#     #     process_public_forecast_tc_outlook,
+#     # ),
+#     PageToFetch(
+#         "/forecast-division/public-forecast/7-day", process_public_forecast_7_day
+#     ),
+#     PageToFetch(
+#         "/forecast-division/public-forecast/media", process_public_forecast_media
+#     ),
+#     # PageToFetch(
+#     #     "/forecast-division/warnings/current-bulletin", process_current_bulletin
+#     # ),
+#     # PageToFetch(
+#     #     "/forecast-division/warnings/severe-weather-warning",
+#     #     process_severe_weather_warning,
+#     # ),
+#     # PageToFetch("/forecast-division/warnings/marine-warning", process_marine_waring),
+#     # PageToFetch(
+#     #     "/forecast-division/warnings/hight-seas-warning", process_hight_seas_warning
+#     # ),
+# ]
 
 
 def check_cache(page: PageToFetch) -> str | None:
@@ -482,10 +490,10 @@ async def process_page(db_session: AsyncSession, ptf: PageToFetch):
     error = None
 
     async with async_session() as db_session:
-        latest_page = await get_latest_page(db_session, ptf.url)
-        if latest_page and as_utc(latest_page.fetched_at) < now() + timedelta(minutes=30):
-            logger.info("Skipping page as it has recently been fetched successfully.")
-            return
+        # latest_page = await get_latest_page(db_session, ptf.url)
+        # if latest_page and as_utc(latest_page.fetched_at) < now() + timedelta(minutes=30):
+        #     logger.info("Skipping page as it has recently been fetched successfully.")
+        #     return
 
         # grab the HTML
         try:
@@ -539,12 +547,93 @@ async def process_page(db_session: AsyncSession, ptf: PageToFetch):
             )
             return False
 
-        page = models.Page(
-            url=ptf.url, issued_at=issued_at, raw_data=data, fetched_at=fetched_at
-        )
-        db_session.add(page)
-        await db_session.commit()
-        return True
+        # XXX in this new style then this would be part of the process function and only errors are handled in this function
+        # page = models.Page(
+        #     url=ptf.url, issued_at=issued_at, raw_data=data, fetched_at=fetched_at
+        # )
+        # db_session.add(page)
+        # await db_session.commit()
+        # return True
+
+        return issued_at, data
+
+
+async def aggregate_forecast_data(data: list[tuple[datetime, any]]):
+    """Handles forecast forecast data which currently comprises of 7-day forecast and 3 day forecast.
+    Together the two pages can form a coherent weekly forecast."""
+
+    issued_at_1, forecast_1 = data[0]
+    issued_at_2, forecast_2 = data[1]
+
+    locations_1 = set(map(lambda f: f[0].lower(), forecast_1))
+    locations_2 = set(map(lambda f: f['location'].lower(), forecast_2))
+    assert locations_1 == locations_2, "Forecast locations differ"
+
+    # Organize data by location
+    forecasts = {}
+    for name in locations_1:
+        forecast = {}
+        data = next(filter(lambda x: x[0].lower() == name, forecast_1))
+        v = ListValidator(process_forecast_schema)
+        normalized_data = v.normalized_as_dict(data)
+        forecast["data_1"] = normalized_data
+        data = list(filter(lambda x: x['location'].lower() == name, forecast_2))
+        forecast["data_2"] = data
+
+        async with async_session() as db_session:
+            latitude = forecast["data_1"]["latitude"]
+            longitude = forecast["data_1"]["longitude"]
+            location = await save_forecast_location(db_session, name, latitude, longitude)
+            forecast["location"] = location
+        
+        # TODO orgainize data for each location into forecast objects
+        
+        # index 6/7 is daily humi values
+    for location in forecast.keys():
+        pass
+
+
+
+page_sets = [
+    PageSet(
+        pages = [
+            PageToFetch("/forecast-division", process_forecast),
+            PageToFetch(
+                "/forecast-division/public-forecast/7-day", process_public_forecast_7_day
+            ),
+        ],
+        process = aggregate_forecast_data, 
+    ),
+]
+
+
+async def aggregate_data(page_set: PageSet):
+    async with httpx.AsyncClient() as client:
+        set_data = []
+        for ptf in page_set.pages:
+            logger.debug(ptf)
+            # TODO later: somehow make sure the whole set exists if a page was recently fetched successfully already
+            # TODO fetch each url async like
+            # TODO process the data
+            try:
+                logger.info(f"ptf {ptf.url}")
+                page_data = await process_page(None, ptf)
+                logger.info(f"got data len {len(page_data)}")
+                if not page_data:
+                    raise Exception("No return")
+            except:
+                logger.error("Processing page failed, aborting the full page set")
+                raise
+            set_data.append(page_data)
+
+            # TODO lastly, run the PageSet.process function to aggregate and store a coherent forecast to database for use by API
+            # this will need to be unique for each page set.
+            # Some of the simple pages to fetch could do without this step perhaps.
+            # ... or `run_process_all_pages` does PageSets and individual pages
+
+    # TODO handle errors, etc.
+    await page_set.process(set_data)
+    # expect indexerror
 
 
 async def process_all_pages(db_session) -> None:
@@ -561,6 +650,10 @@ async def run_process_all_pages() -> None:
     #         for ptf in pages_to_fetch:
     #             tg.start_soon(process_page, ptf)
 
+    # async with anyio.create_task_group() as tg:
+    #     for ptf in pages_to_fetch:
+    #         tg.start_soon(process_page, None, ptf)
+
     async with anyio.create_task_group() as tg:
-        for ptf in pages_to_fetch:
-            tg.start_soon(process_page, None, ptf)
+        for ss in page_sets:
+            tg.start_soon(aggregate_data, ss)
