@@ -20,13 +20,16 @@
 }
 
 /*
- * /v1/forecast/meda
+ * /v1/forecast/media
  */
 {
-    "meta": {},
+    "meta": ...,
     "data": {
         "summary": "",
-        "file": "/url.jpg"
+        "images": [
+            "/image-1.png",
+            "/image-2.png"
+        ]
     }
 }
 
@@ -62,7 +65,7 @@
  * /v1/warnings
  */
 {
-    "meta": {},
+    "meta": ...,
     "data": {
         ...
     }

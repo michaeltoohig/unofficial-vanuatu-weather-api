@@ -22,3 +22,5 @@ High-level steps
 - [ ] add commands which populate database
 - [ ] create API endpoints
 - [ ] include sanity checks and alerts to admin
+
+- [ ] sort how to handle pages that contain images
