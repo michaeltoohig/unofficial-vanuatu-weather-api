@@ -34,7 +34,7 @@ def _save_html(html: str, fp: Path) -> Path:
         if not fp.parent.exists():
             fp.parent.mkdir(parents=True)
     fp.write_text(html)
-    return fp
+
 
 
 class FetchError(Exception):
