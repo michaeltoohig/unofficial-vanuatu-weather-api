@@ -56,6 +56,20 @@ class Page(Base):
         self._raw_data = json.dumps(data)
 
 
+# TODO save images collected from some pages
+#
+# class PageImage(Base):
+#     __tablename__ = "page_image"
+    
+#     id = Column(Integer, primary_key=True, index=True)
+#     fetched_at = Column(DateTime(timezone=True), nullable=False)
+#     issued_at = Column(DateTime(timezone=True), nullable=False)
+
+#     url = Column(String, nullable=False)
+#     name = Column(String, nullable=False)
+#     file_hash = Column(String, nullable=False)
+
+
 class PageError(Base):
     __tablename__ = "page_error"
 
