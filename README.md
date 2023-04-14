@@ -30,4 +30,11 @@ Plan going forward
 Advantages:
  - PageError models strategy handles errors and stores failed html/data for review in future
  - Our scraped data schemas almost guarentee if we have valid data we expect then processing completely to a forecast or other final data format for the API should be consistent
- - Allows flexability for scraping data from different pages that all don't follow the same fetch -> process -> save JSON-like data format to allow saving images or one-off hash checks etc. 
+ - Allows flexability for scraping data from different pages that all don't follow the same fetch -> process -> save JSON-like data format to allow saving images or one-off hash checks etc.
+
+Disadvantages:
+ - Larger more complex processing functions which
+ - Doesn't account for multiple pages that need to be joined together to create a single forecast
+
+Solution Plan:
+ - Use  

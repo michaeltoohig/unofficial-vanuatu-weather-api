@@ -28,6 +28,7 @@ async def save_forecast_location(
     if location_object is None:
         location_object = models.Location(name, latitude, longitude)
         db_session.add(location_object)
+        await db_session.commit()
         await db_session.flush()
         await db_session.refresh(location_object)
     return location_object
