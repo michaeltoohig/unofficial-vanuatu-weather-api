@@ -1,6 +1,7 @@
 from datetime import datetime
 import json
 from pathlib import Path
+from tkinter import N
 from typing import Any
 
 from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String
@@ -21,6 +22,14 @@ class Location(Base):
     name = Column(String, nullable=False, unique=True)
     latitude = Column(Float, nullable=False)
     longitude = Column(Float, nullable=False)
+
+    def __init__(self, name: str, latitude: float, longitude: float):
+        self.name = name
+        self.latitude = latitude
+        self.longitude = longitude
+
+    def __repr__(self):
+        return f"<Location({self.name})>"
 
 
 class Page(Base):
@@ -123,17 +132,29 @@ class PageError(Base):
         self._errors = json.dumps(obj)
 
 
-# class Forecast(Base):
-#     __tablename__ = "forecast"
+# class ForecastDaily(Base):
+#     __tablename__ = "forecast_daily"
 
 #     id = Column(Integer, primary_key=True, index=True)
-#     fetched_at = Column(DateTime(timezone=True), nullable=False, default=now)
+#     fetched_at = Column(DateTime(timezone=True), nullable=False)
 #     issued_at = Column(DateTime(timezone=True), nullable=False)
 
-#     location_id = Column(Integer, ForeignKey("location"), nullable=False)
+#     location_id = Column(Integer, ForeignKey("location.id"), nullable=False)
 #     location = relationship("Location")
 
-#     # TODO
+#     date = Column(DateTime(timezone=True), nullable=False)
+#     summary = Column(String, nullable=False)
+#     minTemp = Column(Integer, nullable=False)
+#     maxTemp = Column(Integer, nullable=False)
+#     minHumi = Column(Integer, nullable=False)
+#     maxHumi = Column(Integer, nullable=False)
+#     # below values are available in 6 hour increments so we would have to calculate a daily average for each
+#     # windSpeed = Column(Integer, nullable=False)
+#     # windDir = Column(Float, nullable=False)
+
+    
+
+    # TODO
 
 
 # class ForecastError(Base):
