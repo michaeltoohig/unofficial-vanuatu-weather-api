@@ -1,5 +1,8 @@
+from datetime import datetime
+from typing import Any
 
-# TODO rename process to scrape
+from loguru import logger
+
 
 async def fetch(url: str) -> str:
     logger.info(f"Fetching {url}")
@@ -27,10 +30,10 @@ async def fetch(url: str) -> str:
 
 
 
-ProcessResult = tuple[datetime, Any]
+ScrapeResult = tuple[datetime, Any]
 
 
-async def process_forecast(html: str) -> ProcessResult:
+async def scrape_forecast(html: str) -> ScrapeResult:
     """The main forecast page with daily temperature and humidity information and 6 hour
     interval resolution for weather condition, wind speed/direction.
     All information is encoded in a special `<script>` that contains a `var weathers`
@@ -82,7 +85,7 @@ async def process_forecast(html: str) -> ProcessResult:
 #################
 
 
-async def process_public_forecast(html: str) -> ProcessResult:
+async def scrape_public_forecast(html: str) -> ScrapeResult:
     """The about page of the weather forecast section.
 
     TODO collect the text from table element with `<article class="item-page">` and
@@ -94,7 +97,7 @@ async def process_public_forecast(html: str) -> ProcessResult:
     raise NotImplementedError
 
 
-async def process_public_forecast_policy(html: str) -> ProcessResult:
+async def scrape_public_forecast_policy(html: str) -> ScrapeResult:
     # TODO hash text contents of `<table class="forecastPublic">` to make a sanity
     # check that data presented or how data is processed is not changed. Only store
     # copies of the page that show a new hash value... I think. But maybe this is
@@ -102,7 +105,7 @@ async def process_public_forecast_policy(html: str) -> ProcessResult:
     raise NotImplementedError
 
 
-async def process_severe_weather_outlook(html: str) -> ProcessResult:
+async def scrape_severe_weather_outlook(html: str) -> ScrapeResult:
     raise NotImplementedError
     soup = BeautifulSoup(html, "html.parser")
     table = soup.find("table", class_="severeTable")
@@ -115,13 +118,13 @@ async def process_severe_weather_outlook(html: str) -> ProcessResult:
     # any additional trX should be alerted and accounted for in future
 
 
-async def process_public_forecast_tc_outlook(html: str) -> ProcessResult:
+async def scrape_public_forecast_tc_outlook(html: str) -> ScrapeResult:
     raise NotImplementedError
 
 
 
 
-async def process_public_forecast_7_day(html: str) -> ProcessResult:
+async def scrape_public_forecast_7_day(html: str) -> ScrapeResult:
     """Simple weekly forecast for all locations containing daily low/high temperature,
     and weather condition summary.
     """
@@ -168,7 +171,7 @@ async def process_public_forecast_7_day(html: str) -> ProcessResult:
     return issued_at, forecasts
 
 
-async def process_public_forecast_media(html: str) -> ProcessResult:
+async def scrape_public_forecast_media(html: str) -> ScrapeResult:
     soup = BeautifulSoup(html, "html.parser")
     try:
         table = soup.find("table", class_="forecastPublic")
@@ -202,7 +205,7 @@ async def process_public_forecast_media(html: str) -> ProcessResult:
 ##########
 
 
-async def process_current_bulletin(html: str) -> ProcessResult:
+async def scrape_current_bulletin(html: str) -> ScrapeResult:
     raise NotImplementedError
     soup = BeautifulSoup(html, "html.parser")
     warning_div = soup.find("div", class_="foreWarning")
@@ -214,16 +217,16 @@ async def process_current_bulletin(html: str) -> ProcessResult:
         pass
 
 
-async def process_severe_weather_warning(html: str) -> ProcessResult:
+async def scrape_severe_weather_warning(html: str) -> ScrapeResult:
     # TODO extract data from table with class `marineFrontTabOne`
     raise NotImplementedError
 
 
-async def process_marine_waring(html: str) -> ProcessResult:
+async def scrape_marine_waring(html: str) -> ScrapeResult:
     # TODO extract data from table with class `marineFrontTabOne`
     raise NotImplementedError
 
 
-async def process_hight_seas_warning(html: str) -> ProcessResult:
+async def scrape_hight_seas_warning(html: str) -> ScrapeResult:
     # TODO extract data from `<article class="item-page">` and handle no warnings by text `NO CURRENT WARNING`
     raise NotImplementedError
