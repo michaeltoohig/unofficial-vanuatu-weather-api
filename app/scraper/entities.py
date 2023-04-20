@@ -1,29 +1,109 @@
-
-
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from typing import List
 
-from app.scraper.mappings import PageMapping
+from cerberus_list_schema import Validator as ListValidator
+from cerberus import Validator, SchemaError
+from loguru import logger
 
+from app.database import AsyncSession, async_session
+from app.locations import save_forecast_location
+from app.scraper.pages import PageMapping
+from app.scraper.schemas import process_forecast_schema, process_public_forecast_7_day_schema
 
 @dataclass
 class ForecastEntity:
     page_mappings: List[PageMapping]
-    # aggregator: callable | None = None  <-- example to replace self.scrape
 
-    # this is probably unnecessary... most pages are scraped just the same as far as I can see.
-    # maybe set an aggregate function callable then if needed replace it per entity
-    def scrape(self):
-        page_data = {}
-        for mapping in self.page_mappings:
-            """
-            data = process_page(mapping.url)  # rename to scrape_page have another form of the same function for process_page_image, etc to handle pages with image data, etc.
-            page_data.update(data)
-            """
+    async def process(self, data):
+        """Handles forecast forecast data which currently comprises of 7-day forecast and 3 day forecast.
+        Together the two pages can form a coherent weekly forecast."""
 
-    def process(self, data_1, data_2):
-        pass
-        # process extensive work but then save to database like our current aggregate_forecast_data function
+        print(data)
+        issued_at_1, forecast_1 = data[0]
+        issued_at_2, forecast_2 = data[1]
+
+        locations_1 = set(map(lambda f: f[0], forecast_1))
+        locations_2 = set(map(lambda f: f['location'], forecast_2))
+        assert locations_1 == locations_2, "Forecast locations differ"
+
+        # Organize data by location
+        forecasts = {}
+        for name in locations_1:
+            forecast = {}
+            data = next(filter(lambda x: x[0].lower() == name.lower(), forecast_1))
+            v = ListValidator(process_forecast_schema)  # TODO add schema to PageMapping - Add result data to PageMapping so we fetch it from there instead of a param on the method
+            normalized_data = v.normalized_as_dict(data)
+            starting_dt = datetime.strftime("%a %d", normalized_data["date"][0]).replace(year=issued_at_1.year, month=issued_at_1.month)
+            dates = {0: starting_dt}
+            for i in range(1, len(normalized_data["date"].keys())):
+                dates[i] = starting_dt + timedelta(days=1)
+                assert normalized_data["date"][i] == dates[i].strftime("%a %d")
+            normalized_data["date"] = dates
+            forecast["data_1"] = normalized_data
+            data = list(filter(lambda x: x['location'].lower() == name.lower(), forecast_2))
+            starting_dt = datetime.strftime("%A %d", data[0]["date"]).replace(year=issued_at_2.year, month=issued_at_2.month)
+            for i in data:
+                assert True
+            forecast["data_2"] = data
+
+            # Save location with forecast
+            async with async_session() as db_session:
+                latitude = forecast["data_1"]["latitude"]
+                longitude = forecast["data_1"]["longitude"]
+                location = await save_forecast_location(db_session, name, latitude, longitude)
+                forecast["location"] = location
+            
+        # TODO orgainize data for each location into forecast objects
+            
+            # assert issued_at_1.strftime("%a %d") == forecast["data_1"]["date"][0]
+
+            # Create daily forecast objects
+            fo = forecast["data_1"]
+            wanted_keys = ["date", "minTemp", "maxTemp", "minHumi", "maxHumi"]
+            results = []
+            for i in range(6):  # 7 days
+                newDict = {}
+                for key, value in fo.items():
+                    if key in wanted_keys:
+                        newDict[key] = value[i]
+                # assert forecast["data_2"][i]["date"] == newDict["date"]
+                newDict.update({"summary": forecast["data_2"][0]["summary"]})
+                newDict.update({"location": forecast["location"]})
+                results.append(newDict)
+            
+            import pdb; pdb.set_trace()
+            
+            
+            # data = [{key: value[i] for key, value in data.items()} for i in range(len(next(iter(data.values()))))]
+            data = []
+            for i in range(len(forecast["data_1"]["dates"]) - 1):
+                fo = forecast["data_1"]
+                try:
+                    da = dict(
+                        date=fo["dates"][i],
+                        minTemp=fo["minTemps"][i],
+                        maxTemp=fo["maxTemps"][i],
+                        minHumi=fo["minHumi"][i],
+                        maxHumi=fo["maxHumi"][i],
+                        summary=None,
+                    )
+                    data.append(da)
+                except KeyError:
+                    logger.debug(f"{name} has run short at index={i}")
+            forecast["daily"] = data
+
+            # Create quarterly forecast objects
+            import pdb; pdb.set_trace()
+            
+            data = []
+            for i in range(len(forecast["data_2"])):
+                pass
+
+            
+            # index 6/7 is daily humi values
+        for location in forecast.keys():
+            pass
 
 
 @dataclass

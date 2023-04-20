@@ -5,7 +5,7 @@ import uuid
 
 import httpx
 
-from app.scraper.utils import _save_html
+# from app.scraper.utils import _save_html
 
 
 class FetchError(Exception):
@@ -13,7 +13,7 @@ class FetchError(Exception):
         resp_part = ""
         if resp:
             filename = Path("errors") / str(uuid.uuid4())
-            filepath = _save_html(resp.text, filename)
+            # filepath = _save_html(resp.text, filename)
             resp_part = f", got HTTP {resp.status_code}, review HTML at {str(filename)}"
         message = f"Failed to fetch {url}{resp_part}"
         super().__init__(message)

@@ -1,105 +1,64 @@
+import httpx
 
-from dataclasses import dataclass
-from app.config import BASE_URL
+from app.database import AsyncSession, async_session
 from app.scraper.entities import ForecastEntity, ForecastMedia
-
-from app.scraper.scrapers import scrape_forecast, scrape_public_forecast_7_day, scrape_public_forecast_media
-
-# TODO this whole file is unnecessary if I define a PageMapping inline with its entity class
-# TODO rename process to scrape
-# - remove large 
-
-
-@dataclass
-class PageMapping:
-    relative_url: str
-    process: callable
-    # process_images: callable | None  # TODO decide how to handle pages that have images.
-    # either a new process step to define for each page
-    # or better yet return an 'images' key with the process results and treat that key special in the `process_page` function
-    # the next level would be to save `PageImage` models as children of the Page model to keep them sorted and to prevent saving duplicate images store image hashes there, etc.
-    # TODO figure it out next time to continue here
-
-    @property
-    def url(self):
-        return BASE_URL + self.relative_url
-
-    @property
-    def slug(self):
-        return self.relative_url.rsplit("/", 1)[1]
+from app.scraper.pages import PageMapping
+from app.scraper.scrapers import (
+    default_scrape_wrapper,
+    scrape_forecast,
+    scrape_public_forecast_7_day,
+    scrape_public_forecast_media,
+)
 
 
 entities = [
-    ForecastEntity([
-        PageMapping("/forecast-division", scrape_forecast),
-        PageMapping(
-            "/forecast-division/public-forecast/7-day", scrape_public_forecast_7_day
-        ),
-    ]),
-    ForecastMedia(PageMapping(
-        "/forecast-division/public-forecast/media", scrape_public_forecast_media
-    ))
+    ForecastEntity(
+        [
+            PageMapping(
+                "/forecast-division",
+                process=scrape_forecast,
+                scraper=default_scrape_wrapper,
+            ),
+            PageMapping(
+                "/forecast-division/public-forecast/7-day",
+                process=scrape_public_forecast_7_day,
+                scraper=default_scrape_wrapper,
+            ),
+        ]
+    ),
+    # ForecastMedia(PageMapping(
+    #     "/forecast-division/public-forecast/media", scrape_public_forecast_media, scrape_page_with_image,
+    # ))
 ]
 
 
 async def run_process_all_entities() -> None:
-    # TODO 
+    # TODO
     pass
 
 
-async def run_process_all_pages() -> None:
+async def run_process_all_entities() -> None:
     """CLI entrypoint."""
-    # TODO
-    for entity in entities:
-        entity.scrape()
-        entity.process()
+    async with httpx.AsyncClient() as client:
+        for entity in entities:
+            entity_data = {}
+            async with async_session() as db_session:
+                for mapping in entity.page_mappings:
+                    page_data = await mapping.scraper(db_session, mapping)
+                    entity_data.append(page_data)
+                await entity.process(entity_data)
         # etc... WIP
 
 
-# pages_to_fetch = [
-#     PageMapping("/forecast-division", process_forecast),
-#     # PageMapping("/forecast-division/public-forecast", process_public_forecast),
-#     # PageMapping(
-#     #     "/forecast-division/public-forecast/forecast-policy",
-#     #     process_public_forecast_policy,
-#     # ),
-#     # PageMapping(
-#     #     "/forecast-division/public-forecast/severe-weather-outlook",
-#     #     process_severe_weather_outlook,
-#     # ),
-#     # PageMapping(
-#     #     "/forecast-division/public-forecast/tc-outlook",
-#     #     process_public_forecast_tc_outlook,
-#     # ),
-#     PageMapping(
-#         "/forecast-division/public-forecast/7-day", process_public_forecast_7_day
-#     ),
-#     PageMapping(
-#         "/forecast-division/public-forecast/media", process_public_forecast_media
-#     ),
-#     # PageMapping(
-#     #     "/forecast-division/warnings/current-bulletin", process_current_bulletin
-#     # ),
-#     # PageMapping(
-#     #     "/forecast-division/warnings/severe-weather-warning",
-#     #     process_severe_weather_warning,
-#     # ),
-#     # PageMapping("/forecast-division/warnings/marine-warning", process_marine_waring),
-#     # PageMapping(
-#     #     "/forecast-division/warnings/hight-seas-warning", process_hight_seas_warning
-#     # ),
-# ]
-
-
-# # TODO remove - use entities instead
+# NOTE alternative approach that doesn't require Entity classes but just a file containing aggregation functions
 # page_sets = [
-#     PageSet(
+#     Entity(
 #         pages = [
 #             PageMapping("/forecast-division", process_forecast),
 #             PageMapping(
 #                 "/forecast-division/public-forecast/7-day", process_public_forecast_7_day
 #             ),
 #         ],
-#         process = aggregate_forecast_data, 
+#         appgregate = aggregate_forecast_data,
 #     ),
 # ]
