@@ -39,7 +39,7 @@ class PageMapping:
 
     @property
     def url(self):
-        return config.BASE_URL + self.relative_url
+        return config.VMGD_BASE_URL + self.relative_url
 
     @property
     def slug(self):
@@ -114,7 +114,7 @@ async def process_page_mapping(db_session: AsyncSession, mapping: PageMapping):
     except PageNotFoundError:
         error = (PageErrorTypeEnum.NOT_FOUND, e)
     except Exception as exc:
-        logger.exception("Unexpected error fetching page: %s", str(exc))
+        logger.exception("Unexpected error fetching page: %s" % str(exc))
         error = (PageErrorTypeEnum.INTERNAL_ERROR, None)
 
     if error:
@@ -139,7 +139,7 @@ async def process_page_mapping(db_session: AsyncSession, mapping: PageMapping):
     except ScrapingIssuedAtError as e:
         error = (PageErrorTypeEnum.ISSUED_NOT_FOUND, e)
     except Exception as exc:
-        logger.exception("Unexpected error processing page: %s", str(exc))
+        logger.exception("Unexpected error processing page: %s" % str(exc))
         error = (PageErrorTypeEnum.INTERNAL_ERROR, None)
         return False
 

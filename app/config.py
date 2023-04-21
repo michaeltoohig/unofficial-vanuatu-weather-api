@@ -34,6 +34,8 @@ class Config(BaseModel):
     debug: bool = True
     sqlalchemy_database: str | None = None
 
+    vmgd_base_url = "https://www.vmgd.gov.vu/vmgd/index.php"
+
 
 # def load_config() -> Config:
 #     try:
@@ -55,3 +57,5 @@ BASE_URL = f"{_SCHEME}://{DOMAIN}"
 DEBUG = CONFIG.debug
 DB_PATH = CONFIG.sqlalchemy_database or ROOT_DIR / "data" / "db.sqlite"
 SQLALCHEMY_DATABASE_URL = f"sqlite:///{DB_PATH}"
+
+VMGD_BASE_URL = CONFIG.vmgd_base_url

@@ -74,6 +74,6 @@ process_public_forecast_7_day_schema = {
     "location": {"type": "string", "empty": False},
     "date": {"type": "string", "empty": False},
     "summary": {"type": "string"},
-    "minTemp": {"type": "integer", "coerce": int, "min": 0, "max": 50},
-    "maxTemp": {"type": "integer", "coerce": int, "min": 0, "max": 50},
+    "minTemp": {"type": "integer", "coerce": int},
+    "maxTemp": {"type": "integer", "coerce": int},
 }
