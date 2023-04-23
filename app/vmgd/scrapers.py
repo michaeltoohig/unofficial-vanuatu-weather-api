@@ -14,7 +14,7 @@ from app.database import AsyncSession, async_session
 from app.pages import handle_page_error, process_issued_at
 from app.vmgd.exceptions import FetchError, PageNotFoundError, PageUnavailableError, PageErrorTypeEnum, ScrapingError, ScrapingIssuedAtError, ScrapingNotFoundError, ScrapingValidationError
 # from app.scraper.pages import PageMapping
-from app.vmgd.schemas import process_public_forecast_7_day_schema, process_forecast_schema
+from app.vmgd.schemas import WeatherObject, process_public_forecast_7_day_schema, process_forecast_schema
 # from app.utils.datetime import as_vu_to_utc, now
 
 
@@ -22,7 +22,7 @@ from app.vmgd.schemas import process_public_forecast_7_day_schema, process_forec
 ScrapeResult = tuple[datetime, Any]
 
 
-async def scrape_forecast(html: str) -> ScrapeResult:
+async def scrape_forecast(html: str) -> tuple[datetime, list[WeatherObject]]:
     """The main forecast page with daily temperature and humidity information and 6 hour
     interval resolution for weather condition, wind speed/direction.
     All information is encoded in a special `<script>` that contains a `var weathers`
@@ -53,6 +53,7 @@ async def scrape_forecast(html: str) -> ScrapeResult:
                 errors.append(v.errors)
         if errors:
             raise ScrapingValidationError(html, weathers, errors)
+        weathers = list(map(lambda w: WeatherObject(*w), weathers))
     except SchemaError as exc:
         raise ScrapingValidationError(html, weathers, str(exc))
     # I believe catching a general exception here negates the use of raising the error above

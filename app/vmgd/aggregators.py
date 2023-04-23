@@ -12,45 +12,53 @@ from app.database import AsyncSession, async_session
 from app.locations import get_location_by_name, save_forecast_location
 from app.models import Location
 from app.vmgd.schemas import (
+    WeatherObject,
     process_forecast_schema,
     process_public_forecast_7_day_schema,
 )
 
 
-@dataclass
-class ForecastDailyIn(frozen=True, kw_only=True):
+@dataclass(frozen=True, kw_only=True)
+class ForecastDailyCreate:
     location: Location
     date: datetime
     summary: str
-    minX: int
-    maxX: int
-    minY: int
-    maxY: int
+    minTemp: int
+    maxTemp: int
+    minHumi: int
+    maxHumi: int
 
 
-@dataclass
-class WeatherData:
-    location: str
-    latitude: float
-    longitude: float
-    dates: List[str]
-    minX: List[int]
-    maxX: List[int]
-    minY: List[int]
-    maxY: List[int]
-    conds: List[int]
-    wd: List[float]
-    ws: List[int]
-    dtFlag: int
-    currentDate: str
-    dateHour: List[str]
-
-
-async def handle_location(l, d1, d2):
+async def handle_location(l: Location, wo: WeatherObject, d2):
     dlist = []
-    for date, minX, maxX, minY, minY, maxY, x in zip(d1.dates, d1.minX, d1.maxX, d1.minY, d1.maxY, d2):
+    for date, minTemp, maxTemp, minHumi, maxHumi, x in zip(
+        wo.dates,
+        wo.minTemp,
+        wo.maxTemp,
+        wo.minHumi,
+        wo.maxHumi,
+        d2,
+    ):
+        import pdb; pdb.set_trace()  # fmt: skip
         assert x["date"] == date, "d mismatch"
-        d = ForecastDailyIn(location=l, date=date, minX=minX, maxX=maxX, minY=minY, maxY=maxY)
+        d = ForecastDailyCreate(
+            location=l,
+            date=date,
+            summary=x["summary"],
+            minTemp=min(x["minTemp"], minTemp),
+            maxTemp=max(x["maxTemp"], maxTemp),
+            minHumi=minHumi,
+            maxHumi=maxHumi,
+        )
+
+
+def convert_to_datetimes(issued_at: datetime, date_strings: list[str]) -> list[datetime]:
+    datetimes = []
+    for num, date in enumerate(date_strings):
+        start = issued_at + timedelta(days=num)
+        year = start.year
+        month = start.month
+
 
 
 
@@ -58,23 +66,32 @@ async def aggregate_forecast_week(data):
     """Handles forecast forecast data which currently comprises of 7-day forecast and 3 day forecast.
     Together the two pages can form a coherent weekly forecast."""
 
-    issued_at_1, data_1 = data[0]
+    issued_at_1, weather_objects = data[0]
     issued_at_2, data_2 = data[1]
-    # confirm both data sets have all locations
-    assert set(map(lambda d: d[0], data_1)) == set(map(lambda d: d["location"], data_2))
 
-    for data in data_1:
-        # v = ListValidator(process_forecast_schema)
-        # data = v.normalized_as_dict(data)
-        data = WeatherData(*data)
+    # confirm both data sets have all locations
+    assert set(map(lambda wo: wo.location, weather_objects)) == set(
+        map(lambda d: d["location"], data_2)
+    )
+    
+    # convert string dates to datetimes assuming issued_at matches first in data arrays
+    wo_date_start = weather_objects[]
+    for wo in weather_objects:
+        
+
+
+    for wo in weather_objects:
         async with async_session() as db_session:
             location = await save_forecast_location(
-                db_session, data.location, data.latitude, data.longitude,
+                db_session,
+                wo.location,
+                wo.latitude,
+                wo.longitude,
             )
-            ldata1 = data
-            ldata2 = list(filter(lambda x: x["location"].lower() == location.name.lower(), data_2))
-            await handle_location(location, ldata1, ldata2)
-
+            ldata2 = list(
+                filter(lambda x: x["location"].lower() == location.name.lower(), data_2)
+            )
+            await handle_location(location, wo, ldata2)
 
     return
     # --- below is just ... embarrassing
