@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
 from typing import List
 
 from cerberus_list_schema import Validator as ListValidator
@@ -39,7 +40,6 @@ async def handle_location(l: Location, wo: WeatherObject, d2):
         wo.maxHumi,
         d2,
     ):
-        import pdb; pdb.set_trace()  # fmt: skip
         assert x["date"] == date, "d mismatch"
         d = ForecastDailyCreate(
             location=l,
@@ -52,14 +52,34 @@ async def handle_location(l: Location, wo: WeatherObject, d2):
         )
 
 
-def convert_to_datetimes(issued_at: datetime, date_strings: list[str]) -> list[datetime]:
-    datetimes = []
-    for num, date in enumerate(date_strings):
-        start = issued_at + timedelta(days=num)
-        year = start.year
-        month = start.month
+# def convert_to_datetimes(issued_at: datetime, date_strings: list[str]) -> list[datetime]:
+#     datetimes = []
+#     for num, date_string in enumerate(date_strings):
+#         day, date = date_string.split()
+#         date_string = " ".join([day[:3], date])  # replace "Friday" or "Fri" to "Fri"
+#         start = issued_at + timedelta(days=num)
+#         year = start.year
+#         month = start.month
+#         d = datetime.strptime(date_string, "%a %d").replace(year=year, month=month)
+#         datetimes.append(d)
+#     assert datetimes[0].date() == issued_at.date(), "possible error converting date strings"
+#     return datetimes
 
 
+def convert_to_datetime(date_string: str, issued_at: datetime) -> datetime:
+    """Convert human readable date string such as `Friday 24` or `Fri 24` to datetime.
+    We can do this assuming the following:
+     - the `issued_at` value is never before the `date_string`
+     - the `date_string` is never representing a value greater than 1 month after the `issued_at` date
+    """
+    day = int(date_string.split()[1])
+    if day <= issued_at.day:
+        # we have wrapped around to a new month/year
+        next_month = issued_at + relativedelta(months=1)
+        dt = datetime(next_month.year, next_month.month, day)
+    else:
+        dt = datetime(issued_at.year, issued_at.month, day)
+    return dt
 
 
 async def aggregate_forecast_week(data):
@@ -69,16 +89,20 @@ async def aggregate_forecast_week(data):
     issued_at_1, weather_objects = data[0]
     issued_at_2, data_2 = data[1]
 
+    # confirm both issued_at are the same date
+    assert issued_at_1.date() == issued_at_2.date()
+
     # confirm both data sets have all locations
     assert set(map(lambda wo: wo.location, weather_objects)) == set(
         map(lambda d: d["location"], data_2)
     )
     
-    # convert string dates to datetimes assuming issued_at matches first in data arrays
-    wo_date_start = weather_objects[]
+    # convert string dates to datetimes
     for wo in weather_objects:
-        
-
+        datetimes = list(map(lambda d: convert_to_datetime(d, issued_at_1), wo.dates))
+        wo.dates = datetimes
+    for d in data_2:
+        d["date"] = convert_to_datetime(d["date"], issued_at_1)
 
     for wo in weather_objects:
         async with async_session() as db_session:
