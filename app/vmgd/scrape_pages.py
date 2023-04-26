@@ -1,5 +1,6 @@
-from dataclasses import dataclass
+from dataclasses import Field, dataclass
 from datetime import datetime
+import enum
 import json
 from pathlib import Path
 from typing import Any, List
@@ -13,6 +14,7 @@ from loguru import logger
 from app import config
 
 from app.database import AsyncSession, async_session
+from app.models import Session
 from app.pages import handle_page_error, process_issued_at
 from app.vmgd.aggregators import aggregate_forecast_week
 from app.vmgd.exceptions import FetchError, PageNotFoundError, PageUnavailableError, PageErrorTypeEnum, ScrapingError, ScrapingIssuedAtError, ScrapingNotFoundError, ScrapingValidationError
@@ -170,12 +172,21 @@ async def process_page_mapping(db_session: AsyncSession, mapping: PageMapping):
 
 @dataclass
 class PageSet:
+    name: str
     pages: List[PageMapping]
     process: callable  # processes results from PageMappings
+    # fetched_at: Field(init=False)
+    session: Session = Field(init=False)  # TODO session that stores a shared 
+
+
+class SessionType(enum.Enum):
+    GENERAL_FORECAST = "forecast_general"
+
 
 
 page_sets = [
     PageSet(
+        name = SessionType.GENERAL_FORECAST,
         pages = [
             PageMapping("/forecast-division", scrape_forecast),
             PageMapping(
@@ -189,30 +200,44 @@ page_sets = [
 
 # aggregate_data
 async def process_page_set(page_set: PageSet):
-    set_data = []
-    for mapping in page_set.pages:
-        logger.debug(mapping)
-        # TODO later: somehow make sure the whole set exists if a page was recently fetched successfully already
-        # TODO fetch each url async like
-        # TODO process the data
-        try:
-            logger.info(f"page url {mapping.url}")
-            page_data = await process_page_mapping(None, mapping)
-            if not page_data:
-                raise Exception("No return")
-            logger.info(f"got data len {len(page_data)}")
-        except:
-            logger.error("Processing page failed, aborting the full page set")
-            raise
-        set_data.append(page_data)
+    async with AsyncSession() as db_session:
+        session = Session(page_set.name.value)
+        db_session.add(session)
+        db_session.commit()
+        page_set.session = session
+    try:
+        set_data = []
+        for mapping in page_set.pages:
+            logger.debug(mapping)
+            # TODO later: somehow make sure the whole set exists if a page was recently fetched successfully already
+            # TODO fetch each url async like
+            # TODO process the data
+            try:
+                logger.info(f"page url {mapping.url}")
+                page_data = await process_page_mapping(None, mapping)
+                if not page_data:
+                    raise Exception("No return")
+                logger.info(f"got data len {len(page_data)}")
+            except:
+                logger.error("Processing page failed, aborting the full page set")
+                raise
+            set_data.append(page_data)
 
-        # TODO lastly, run the PageSet.process function to aggregate and store a coherent forecast to database for use by API
-        # this will need to be unique for each page set.
-        # Some of the simple pages to fetch could do without this step perhaps.
-        # ... or `run_process_all_pages` does PageSets and individual pages
+            # TODO lastly, run the PageSet.process function to aggregate and store a coherent forecast to database for use by API
+            # this will need to be unique for each page set.
+            # Some of the simple pages to fetch could do without this step perhaps.
 
-    # TODO handle errors, etc.
-    await page_set.process(set_data)
+        # TODO handle errors, etc.
+            # ... or `run_process_all_pages` does PageSets and individual pages
+        await page_set.process(page_set.session.started, set_data)
+    except Exception as exc:
+        # TODO better handling
+        logger.exception("Session failed: %s" % str(exc))
+    finally:
+        pass
+        # async with AsyncSession() as db_session:
+        #     page_set.session.completed = now()
+        #     # TODO add errors or something?
 
 
 async def run_process_all_pages() -> None:

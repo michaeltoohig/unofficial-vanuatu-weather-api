@@ -1,6 +1,6 @@
 """Functions that handle the messy work of aggregating and cleaning the results of scrapers."""
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 from typing import List
@@ -11,7 +11,7 @@ from loguru import logger
 
 from app.database import AsyncSession, async_session
 from app.locations import get_location_by_name, save_forecast_location
-from app.models import Location
+from app.models import ForecastDaily, Location
 from app.vmgd.schemas import (
     WeatherObject,
     process_forecast_schema,
@@ -31,7 +31,7 @@ class ForecastDailyCreate:
 
 
 async def handle_location(l: Location, wo: WeatherObject, d2):
-    dlist = []
+    forecasts = []
     for date, minTemp, maxTemp, minHumi, maxHumi, x in zip(
         wo.dates,
         wo.minTemp,
@@ -41,7 +41,7 @@ async def handle_location(l: Location, wo: WeatherObject, d2):
         d2,
     ):
         assert x["date"] == date, "d mismatch"
-        d = ForecastDailyCreate(
+        forecast = ForecastDailyCreate(
             location=l,
             date=date,
             summary=x["summary"],
@@ -50,20 +50,8 @@ async def handle_location(l: Location, wo: WeatherObject, d2):
             minHumi=minHumi,
             maxHumi=maxHumi,
         )
-
-
-# def convert_to_datetimes(issued_at: datetime, date_strings: list[str]) -> list[datetime]:
-#     datetimes = []
-#     for num, date_string in enumerate(date_strings):
-#         day, date = date_string.split()
-#         date_string = " ".join([day[:3], date])  # replace "Friday" or "Fri" to "Fri"
-#         start = issued_at + timedelta(days=num)
-#         year = start.year
-#         month = start.month
-#         d = datetime.strptime(date_string, "%a %d").replace(year=year, month=month)
-#         datetimes.append(d)
-#     assert datetimes[0].date() == issued_at.date(), "possible error converting date strings"
-#     return datetimes
+        forecasts.append(forecast)
+    return forecasts
 
 
 def convert_to_datetime(date_string: str, issued_at: datetime) -> datetime:
@@ -82,7 +70,7 @@ def convert_to_datetime(date_string: str, issued_at: datetime) -> datetime:
     return dt
 
 
-async def aggregate_forecast_week(data):
+async def aggregate_forecast_week(fetched_at: datetime, data):
     """Handles forecast forecast data which currently comprises of 7-day forecast and 3 day forecast.
     Together the two pages can form a coherent weekly forecast."""
 
@@ -105,17 +93,23 @@ async def aggregate_forecast_week(data):
         d["date"] = convert_to_datetime(d["date"], issued_at_1)
 
     for wo in weather_objects:
-        async with async_session() as db_session:
+        async with AsyncSession() as db_session:
             location = await save_forecast_location(
                 db_session,
                 wo.location,
                 wo.latitude,
                 wo.longitude,
             )
-            ldata2 = list(
-                filter(lambda x: x["location"].lower() == location.name.lower(), data_2)
-            )
-            await handle_location(location, wo, ldata2)
+        ldata2 = list(
+            filter(lambda x: x["location"].lower() == location.name.lower(), data_2)
+        )
+        forecasts = await handle_location(location, wo, ldata2)
+        for forecast_create in forecasts:
+            forecast = ForecastDaily(**asdict(forecast_create))
+            forecast.issued_at = issued_at_1
+            forecast.fetched_at = fetched_at
+            db_session.add(forecast)
+        db_session.commit()
 
     return
     # --- below is just ... embarrassing

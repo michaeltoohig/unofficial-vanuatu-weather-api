@@ -32,11 +32,30 @@ class Location(Base):
         return f"<Location({self.name})>"
 
 
+# I am now hestitant to this idea after seeing it as unnecessary complexity
+# a shared `fetched_at` value should be enough to query all forecast rows of a single *session*
+# will rest and think about it
+class Session(Base):
+    __tablename__ = "session"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    started = Column(DateTime(timezone=True), nullable=False, default=now)
+    completed = Column(DateTime(timezone=True))
+    # error handling or record keeping in the session instead of a different table?
+    # _errors = Column("errors", String)
+    # count = Column(Integer)
+
+    def __init__(self, name: str):
+        self.name = name
+
+
 class Page(Base):
     __tablename__ = "page"
 
     id = Column(Integer, primary_key=True, index=True)
-    fetched_at = Column(DateTime(timezone=True), nullable=False)
+    session_id = Column(Integer, ForeignKey("session.id"))  #, nullable=False)
+    fetched_at = Column(DateTime(timezone=True), nullable=False)  # found within session now
     issued_at = Column(DateTime(timezone=True), nullable=False)
 
     url = Column(String, nullable=False)
@@ -132,25 +151,29 @@ class PageError(Base):
         self._errors = json.dumps(obj)
 
 
-# class ForecastDaily(Base):
-#     __tablename__ = "forecast_daily"
+class ForecastDaily(Base):
+    __tablename__ = "forecast_daily"
 
-#     id = Column(Integer, primary_key=True, index=True)
-#     fetched_at = Column(DateTime(timezone=True), nullable=False)
-#     issued_at = Column(DateTime(timezone=True), nullable=False)
+    id = Column(Integer, primary_key=True, index=True)
+    # NOTE continue here instead of using session unless new ideas arise after rest
+    # if all forecasts are made with the same `fetched_at` value 
+    # it can be easy to query to the latest location+fetched_at combo 
+    # then fetch all forecast rows that match instead of dealing with Session table
+    fetched_at = Column(DateTime(timezone=True), nullable=False)
+    issued_at = Column(DateTime(timezone=True), nullable=False)
 
-#     location_id = Column(Integer, ForeignKey("location.id"), nullable=False)
-#     location = relationship("Location")
+    location_id = Column(Integer, ForeignKey("location.id"), nullable=False)
+    location = relationship("Location")
 
-#     date = Column(DateTime(timezone=True), nullable=False)
-#     summary = Column(String, nullable=False)
-#     minTemp = Column(Integer, nullable=False)
-#     maxTemp = Column(Integer, nullable=False)
-#     minHumi = Column(Integer, nullable=False)
-#     maxHumi = Column(Integer, nullable=False)
-#     # below values are available in 6 hour increments so we would have to calculate a daily average for each
-#     # windSpeed = Column(Integer, nullable=False)
-#     # windDir = Column(Float, nullable=False)
+    date = Column(DateTime(timezone=True), nullable=False)
+    summary = Column(String, nullable=False)
+    minTemp = Column(Integer, nullable=False)
+    maxTemp = Column(Integer, nullable=False)
+    minHumi = Column(Integer, nullable=False)
+    maxHumi = Column(Integer, nullable=False)
+    # below values are available in 6 hour increments so we would have to calculate a daily average for each
+    # windSpeed = Column(Integer, nullable=False)
+    # windDir = Column(Float, nullable=False)
 
     
 
