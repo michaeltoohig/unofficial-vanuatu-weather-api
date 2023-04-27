@@ -5,7 +5,7 @@ from tkinter import N
 from typing import Any
 
 from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, synonym
 from app.config import ROOT_DIR
 
 from app.database import Base
@@ -40,8 +40,8 @@ class Session(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
-    started = Column(DateTime(timezone=True), nullable=False, default=now)
-    completed = Column(DateTime(timezone=True))
+    started_at = Column(DateTime(timezone=True), nullable=False, default=now)
+    completed_at = Column(DateTime(timezone=True))
     # error handling or record keeping in the session instead of a different table?
     # _errors = Column("errors", String)
     # count = Column(Integer)
@@ -49,12 +49,14 @@ class Session(Base):
     def __init__(self, name: str):
         self.name = name
 
+    fetched_at = synonym("started_at")
+
 
 class Page(Base):
     __tablename__ = "page"
 
     id = Column(Integer, primary_key=True, index=True)
-    session_id = Column(Integer, ForeignKey("session.id"))  #, nullable=False)
+    session_id = Column(Integer, ForeignKey("session.id"), nullable=False)
     fetched_at = Column(DateTime(timezone=True), nullable=False)  # found within session now
     issued_at = Column(DateTime(timezone=True), nullable=False)
 
@@ -64,15 +66,17 @@ class Page(Base):
     def __init__(
         self,
         url: str,
-        issued_at: datetime,
         raw_data: Any,
+        session_id: int,
+        issued_at: datetime,
         fetched_at: datetime | None = None,
     ):
         if fetched_at is None:
             fetched_at = now()
         self.url = url
-        self.issued_at = issued_at
         self.raw_data = raw_data
+        self.issued_at = issued_at
+        self.session_id = session_id
         self.fetched_at = fetched_at
 
     @property
@@ -155,13 +159,10 @@ class ForecastDaily(Base):
     __tablename__ = "forecast_daily"
 
     id = Column(Integer, primary_key=True, index=True)
-    # NOTE continue here instead of using session unless new ideas arise after rest
-    # if all forecasts are made with the same `fetched_at` value 
-    # it can be easy to query to the latest location+fetched_at combo 
-    # then fetch all forecast rows that match instead of dealing with Session table
     fetched_at = Column(DateTime(timezone=True), nullable=False)
     issued_at = Column(DateTime(timezone=True), nullable=False)
 
+    session_id = Column(Integer, ForeignKey("session.id"), nullable=False)
     location_id = Column(Integer, ForeignKey("location.id"), nullable=False)
     location = relationship("Location")
 

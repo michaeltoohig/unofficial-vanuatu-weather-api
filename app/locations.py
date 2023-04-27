@@ -11,11 +11,12 @@ async def get_location_by_name(
     name: str | None,
 ) -> models.Location | None:
     query = select(models.Location).where(func.lower(models.Location.name) == func.lower(name))
-    return (
+    location = (
         await db_session.execute(
             query.limit(1)
         )
     ).scalar()
+    return location
 
 
 async def save_forecast_location(
@@ -24,11 +25,12 @@ async def save_forecast_location(
     latitude: float,
     longitude: float,
 ) -> models.Location:
+    import pdb; pdb.set_trace()  # fmt: skip
     location_object = await get_location_by_name(db_session, name)
     if location_object is None:
         location_object = models.Location(name, latitude, longitude)
         db_session.add(location_object)
-        await db_session.commit()
-        await db_session.flush()
-        await db_session.refresh(location_object)
+        # await db_session.commit()
+        # await db_session.flush()
+        # await db_session.refresh(location_object)
     return location_object

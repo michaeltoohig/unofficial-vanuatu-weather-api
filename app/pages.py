@@ -44,11 +44,12 @@ async def get_latest_page(
     query = select(models.Page).order_by(models.Page.fetched_at.desc())
     if url:
         query = query.where(models.Page.url == url)
-    return (
+    page = (
         await db_session.execute(
             query.limit(1)
         )
     ).scalar()
+    return page
 
 
 def _save_html(html: str, fp: Path) -> None:

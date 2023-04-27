@@ -11,7 +11,7 @@ from loguru import logger
 from app import config
 
 from app.database import AsyncSession, async_session
-from app.pages import handle_page_error, process_issued_at
+from app.pages import process_issued_at
 from app.vmgd.exceptions import FetchError, PageNotFoundError, PageUnavailableError, PageErrorTypeEnum, ScrapingError, ScrapingIssuedAtError, ScrapingNotFoundError, ScrapingValidationError
 # from app.scraper.pages import PageMapping
 from app.vmgd.schemas import WeatherObject, process_public_forecast_7_day_schema, process_forecast_schema
@@ -53,7 +53,8 @@ async def scrape_forecast(html: str) -> tuple[datetime, list[WeatherObject]]:
                 errors.append(v.errors)
         if errors:
             raise ScrapingValidationError(html, weathers, errors)
-        weathers = list(map(lambda w: WeatherObject(*w), weathers))
+        # XXX this makes it hard to serialize into database for `Page` model
+        # weathers = list(map(lambda w: WeatherObject(*w), weathers))
     except SchemaError as exc:
         raise ScrapingValidationError(html, weathers, str(exc))
     # I believe catching a general exception here negates the use of raising the error above

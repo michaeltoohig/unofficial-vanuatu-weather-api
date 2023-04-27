@@ -12,12 +12,13 @@ class FetchError(Exception):
     def __init__(self, url: str, resp: httpx.Response | None = None) -> None:
         resp_part = ""
         if resp:
-            filename = Path("errors") / str(uuid.uuid4())
+            pass
+            # filename = Path("errors") / str(uuid.uuid4())
             # filepath = _save_html(resp.text, filename)
-            resp_part = f", got HTTP {resp.status_code}, review HTML at {str(filename)}"
+            # resp_part = f", got HTTP {resp.status_code}, review HTML at {str(filename)}"
         message = f"Failed to fetch {url}{resp_part}"
         super().__init__(message)
-        self.html_filepath = filepath
+        # self.html_filepath = filepath
         self.resp = resp
         self.url = url
 

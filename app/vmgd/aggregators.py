@@ -11,7 +11,7 @@ from loguru import logger
 
 from app.database import AsyncSession, async_session
 from app.locations import get_location_by_name, save_forecast_location
-from app.models import ForecastDaily, Location
+from app.models import ForecastDaily, Location, Page, Session
 from app.vmgd.schemas import (
     WeatherObject,
     process_forecast_schema,
@@ -70,15 +70,18 @@ def convert_to_datetime(date_string: str, issued_at: datetime) -> datetime:
     return dt
 
 
-async def aggregate_forecast_week(fetched_at: datetime, data):
+async def aggregate_forecast_week(db_session: AsyncSession, session: Session, pages: list[Page]):
     """Handles forecast forecast data which currently comprises of 7-day forecast and 3 day forecast.
     Together the two pages can form a coherent weekly forecast."""
 
-    issued_at_1, weather_objects = data[0]
-    issued_at_2, data_2 = data[1]
+    # issued_at_1, data_1 = data[0]
+    # issued_at_2, data_2 = data[1]
+    weather_objects = list(map(lambda obj: WeatherObject(*obj), pages[0].raw_data))
+    data_2 = pages[1].raw_data
 
     # confirm both issued_at are the same date
-    assert issued_at_1.date() == issued_at_2.date()
+    assert pages[0].issued_at.date() == pages[1].issued_at.date()
+    issued_at = pages[0].issued_at
 
     # confirm both data sets have all locations
     assert set(map(lambda wo: wo.location, weather_objects)) == set(
@@ -87,29 +90,33 @@ async def aggregate_forecast_week(fetched_at: datetime, data):
     
     # convert string dates to datetimes
     for wo in weather_objects:
-        datetimes = list(map(lambda d: convert_to_datetime(d, issued_at_1), wo.dates))
+        datetimes = list(map(lambda d: convert_to_datetime(d, issued_at), wo.dates))
         wo.dates = datetimes
     for d in data_2:
-        d["date"] = convert_to_datetime(d["date"], issued_at_1)
+        d["date"] = convert_to_datetime(d["date"], issued_at)
 
     for wo in weather_objects:
-        async with AsyncSession() as db_session:
-            location = await save_forecast_location(
-                db_session,
-                wo.location,
-                wo.latitude,
-                wo.longitude,
-            )
+        location = await save_forecast_location(
+            db_session,
+            wo.location,
+            wo.latitude,
+            wo.longitude,
+        )
         ldata2 = list(
             filter(lambda x: x["location"].lower() == location.name.lower(), data_2)
         )
         forecasts = await handle_location(location, wo, ldata2)
+        import pdb; pdb.set_trace()  # fmt: skip
+        # XXX continue here
+        # seems I'm stuck on an IntegrityError if location doesn't exist
+        # can't add location to forecast object without an ID?
+        # so maybe I need to process locations prior to this point with a different db_session that adds all locations then continue here.
         for forecast_create in forecasts:
             forecast = ForecastDaily(**asdict(forecast_create))
-            forecast.issued_at = issued_at_1
-            forecast.fetched_at = fetched_at
+            forecast.issued_at = issued_at
+            forecast.fetched_at = session.fetched_at
+            forecast.session_id = session.id
             db_session.add(forecast)
-        db_session.commit()
 
     return
     # --- below is just ... embarrassing
