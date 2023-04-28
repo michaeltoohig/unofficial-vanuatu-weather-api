@@ -1,6 +1,9 @@
+from dataclasses import dataclass
+from datetime import datetime
 import os
 import sys
 import time
+from typing import List
 
 from asgiref.typing import ASGI3Application
 from asgiref.typing import ASGIReceiveCallable
@@ -22,6 +25,7 @@ from sqlalchemy import select
 from app import models, templates
 from app.config import DEBUG
 from app.database import AsyncSession, async_session, get_db_session
+from app.forecasts import get_latest_forecast
 from app.pages import get_latest_page
 
 
@@ -190,3 +194,32 @@ async def raw_pages(
         "url": page.url,
         "data": page.json_data,
     }
+
+
+@dataclass
+class ForecastResponse:
+    location_id: int
+    issued_at: datetime
+    date: datetime
+    summary: str
+    
+
+
+@app.get("/v1/forecast", response_model=List[ForecastResponse])
+async def forecast(
+    request: Request,
+    db_session: AsyncSession = Depends(get_db_session),
+):
+    forecast = await get_latest_forecast(db_session, 1)
+    # TODO look at using pydantic/dataclass models to change models into schemas for API
+    # or consider the downsides of manually defining JSON responses as below
+    # return forecast.all()
+    return [
+        {
+            "location_id": f.location_id,
+            "issued_at": f.issued_at,
+            "date": f.date,
+            "summary": f.summary,
+        }
+        for f in forecast
+    ]

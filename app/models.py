@@ -6,40 +6,20 @@ from typing import Any
 
 from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship, synonym
+from sqlalchemy.ext.hybrid import hybrid_property
 from app.config import ROOT_DIR
 
 from app.database import Base
+
+# from app.scraper.sessions import SessionName
 from app.utils.datetime import now
 
 
-class Location(Base):
-    __tablename__ = "location"
-
-    id = Column(Integer, primary_key=True, index=True)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=now)
-    updated_at = Column(DateTime(timezone=True), nullable=False, default=now)
-
-    name = Column(String, nullable=False, unique=True)
-    latitude = Column(Float, nullable=False)
-    longitude = Column(Float, nullable=False)
-
-    def __init__(self, name: str, latitude: float, longitude: float):
-        self.name = name
-        self.latitude = latitude
-        self.longitude = longitude
-
-    def __repr__(self):
-        return f"<Location({self.name})>"
-
-
-# I am now hestitant to this idea after seeing it as unnecessary complexity
-# a shared `fetched_at` value should be enough to query all forecast rows of a single *session*
-# will rest and think about it
 class Session(Base):
     __tablename__ = "session"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False)
+    _name = Column("name", String, nullable=False)
     started_at = Column(DateTime(timezone=True), nullable=False, default=now)
     completed_at = Column(DateTime(timezone=True))
     # error handling or record keeping in the session instead of a different table?
@@ -47,9 +27,21 @@ class Session(Base):
     # count = Column(Integer)
 
     def __init__(self, name: str):
-        self.name = name
+        self._name = name
 
     fetched_at = synonym("started_at")
+
+    # @hybrid_property
+    # def name(self):
+    #     return SessionName(self._name)
+
+    # @name.setter
+    # def name(self, value: SessionName):
+    #     self._name = value.value
+
+    # @name.expression
+    # def name(cls):
+    #     return cls._name
 
 
 class Page(Base):
@@ -57,15 +49,14 @@ class Page(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     session_id = Column(Integer, ForeignKey("session.id"), nullable=False)
-    fetched_at = Column(DateTime(timezone=True), nullable=False)  # found within session now
     issued_at = Column(DateTime(timezone=True), nullable=False)
 
-    url = Column(String, nullable=False)
+    path = Column("url", String, nullable=False)
     _raw_data = Column("json_data", String, nullable=False)
 
     def __init__(
         self,
-        url: str,
+        path: str,
         raw_data: Any,
         session_id: int,
         issued_at: datetime,
@@ -73,7 +64,7 @@ class Page(Base):
     ):
         if fetched_at is None:
             fetched_at = now()
-        self.url = url
+        self.path = path
         self.raw_data = raw_data
         self.issued_at = issued_at
         self.session_id = session_id
@@ -92,7 +83,7 @@ class Page(Base):
 #
 # class PageImage(Base):
 #     __tablename__ = "page_image"
-    
+
 #     id = Column(Integer, primary_key=True, index=True)
 #     fetched_at = Column(DateTime(timezone=True), nullable=False)
 #     issued_at = Column(DateTime(timezone=True), nullable=False)
@@ -111,7 +102,8 @@ class PageError(Base):
 
     url = Column(String, nullable=False)
     _description = Column("description", String, nullable=False)
-    html_hash = Column(String, nullable=False)
+    exception = Column(String, nullable=False)
+    html_hash = Column(String)
     _raw_data = Column("json_data", String)
     _errors = Column("errors", String)
     count = Column(Integer, default=1)
@@ -120,12 +112,14 @@ class PageError(Base):
         self,
         url: str,
         description: str,
+        exception: str,
         html_hash: str,
         raw_data: Any | None = None,
         errors: Any | None = None,
     ):
         self.url = url
         self._description = description
+        self.exception = exception
         self.html_hash = html_hash
         self.raw_data = raw_data
         self.errors = errors
@@ -155,14 +149,33 @@ class PageError(Base):
         self._errors = json.dumps(obj)
 
 
+class Location(Base):
+    __tablename__ = "location"
+
+    id = Column(Integer, primary_key=True, index=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=now)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=now)
+
+    name = Column(String, nullable=False, unique=True)
+    latitude = Column(Float, nullable=False)
+    longitude = Column(Float, nullable=False)
+
+    def __init__(self, name: str, latitude: float, longitude: float):
+        self.name = name
+        self.latitude = latitude
+        self.longitude = longitude
+
+    def __repr__(self):
+        return f"<Location({self.name})>"
+
+
 class ForecastDaily(Base):
     __tablename__ = "forecast_daily"
 
     id = Column(Integer, primary_key=True, index=True)
-    fetched_at = Column(DateTime(timezone=True), nullable=False)
-    issued_at = Column(DateTime(timezone=True), nullable=False)
-
     session_id = Column(Integer, ForeignKey("session.id"), nullable=False)
+
+    issued_at = Column(DateTime(timezone=True), nullable=False)
     location_id = Column(Integer, ForeignKey("location.id"), nullable=False)
     location = relationship("Location")
 
@@ -175,18 +188,3 @@ class ForecastDaily(Base):
     # below values are available in 6 hour increments so we would have to calculate a daily average for each
     # windSpeed = Column(Integer, nullable=False)
     # windDir = Column(Float, nullable=False)
-
-    
-
-    # TODO
-
-
-# class ForecastError(Base):
-#     __tablename__ = "forecast_scraping_error"
-
-#     id = Column(Integer, primary_key=True, index=True)
-#     created_at = Column(DateTime(timezone=True), nullable=False, default=now)
-
-#     description = Column(String, nullable=False)
-#     url = Column(String, nullable=False)
-#     file = Column(String)  # relative path or filename of html file that caused the error

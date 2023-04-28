@@ -1,3 +1,24 @@
+from dataclasses import dataclass
+
+
+@dataclass
+class WeatherObject:
+    location: str
+    latitude: float
+    longitude: float
+    dates: list[str]
+    minTemp: list[int]
+    maxTemp: list[int]
+    minHumi: list[int]
+    maxHumi: list[int]
+    conds: list[int]
+    wd: list[float]
+    ws: list[int]
+    dtFlag: int
+    currentDate: str
+    dateHour: list[str]
+
+
 process_forecast_schema = {
     "type": "list",
     "items": [
@@ -74,6 +95,6 @@ process_public_forecast_7_day_schema = {
     "location": {"type": "string", "empty": False},
     "date": {"type": "string", "empty": False},
     "summary": {"type": "string"},
-    "minTemp": {"type": "integer", "coerce": int, "min": 0, "max": 50},
-    "maxTemp": {"type": "integer", "coerce": int, "min": 0, "max": 50},
+    "minTemp": {"type": "integer", "coerce": int},
+    "maxTemp": {"type": "integer", "coerce": int},
 }

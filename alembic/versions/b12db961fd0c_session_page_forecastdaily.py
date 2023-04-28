@@ -1,8 +1,8 @@
-"""Page, Session, ForecastDaily
+"""Session, Page, ForecastDaily
 
-Revision ID: af45f0f591da
+Revision ID: b12db961fd0c
 Revises: 5e58e9557435
-Create Date: 2023-04-27 20:07:14.723083
+Create Date: 2023-04-28 09:59:53.227952
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'af45f0f591da'
+revision = 'b12db961fd0c'
 down_revision = '5e58e9557435'
 branch_labels = None
 depends_on = None
@@ -24,7 +24,8 @@ def upgrade() -> None:
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('url', sa.String(), nullable=False),
     sa.Column('description', sa.String(), nullable=False),
-    sa.Column('html_hash', sa.String(), nullable=False),
+    sa.Column('exception', sa.String(), nullable=False),
+    sa.Column('html_hash', sa.String(), nullable=True),
     sa.Column('json_data', sa.String(), nullable=True),
     sa.Column('errors', sa.String(), nullable=True),
     sa.Column('count', sa.Integer(), nullable=True),
@@ -46,7 +47,6 @@ def upgrade() -> None:
     op.create_table('forecast_daily',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('session_id', sa.Integer(), nullable=False),
-    sa.Column('fetched_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('issued_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('location_id', sa.Integer(), nullable=False),
     sa.Column('date', sa.DateTime(timezone=True), nullable=False),
@@ -65,7 +65,6 @@ def upgrade() -> None:
     op.create_table('page',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('session_id', sa.Integer(), nullable=False),
-    sa.Column('fetched_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('issued_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('url', sa.String(), nullable=False),
     sa.Column('json_data', sa.String(), nullable=False),

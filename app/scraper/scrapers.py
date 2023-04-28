@@ -1,149 +1,53 @@
+from typing import Any
 from datetime import datetime
 import json
-from pathlib import Path
-from typing import Any
 
 from bs4 import BeautifulSoup
 from cerberus_list_schema import Validator as ListValidator
 from cerberus import Validator, SchemaError
-import httpx
 from loguru import logger
-from app import config
 
-from app.database import AsyncSession, async_session
-from app.pages import handle_page_error, process_issued_at
-from app.scraper.exceptions import FetchError, PageNotFoundError, PageUnavailableError, PageErrorTypeEnum, ScrapingError, ScrapingIssuedAtError, ScrapingNotFoundError, ScrapingValidationError
-from app.scraper.pages import PageMapping
-from app.scraper.schemas import process_public_forecast_7_day_schema, process_forecast_schema
-from app.utils.datetime import as_vu_to_utc, now
-
-
-
-async def fetch(url: str) -> str:
-    logger.info(f"Fetching {url}")
-
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            url,
-            headers={
-                "User-Agent": config.USER_AGENT,
-            },
-            follow_redirects=True,
-        )
-
-    if resp.status_code in [401, 403]:
-        raise PageUnavailableError(url, resp)
-    elif resp.status_code == 404:
-        raise PageNotFoundError(url, resp)
-
-    try:
-        resp.raise_for_status()
-    except httpx.HTTPError as http_error:
-        raise FetchError(url, resp) from http_error
-
-    return resp.text
-
-
-def check_cache(page: PageMapping) -> str | None:
-    # caching is for development only
-    html = None
-    cache_file = Path(config.ROOT_DIR / "data" / "vmgd" / page.slug)
-    if cache_file.exists():
-        logger.info(f"Fetching page from cache {page.slug=}")
-        html = cache_file.read_text()
-    return html, cache_file
-
-
-async def fetch_page(page: PageMapping):
-    cache_file = None
-    if config.DEBUG:
-        html, cache_file = check_cache(page)
-        if html:
-            return html
-
-    html = await fetch(page.url)
-
-    if config.DEBUG:
-        cache_file.write_text(html)
-    return html
-
-
-async def default_scrape_wrapper(db_session: AsyncSession, mapping: PageMapping):
-    error = None
-
-    # latest_page = await get_latest_page(db_session, ptf.url)
-    # if latest_page and as_utc(latest_page.fetched_at) < now() + timedelta(minutes=30):
-    #     logger.info("Skipping page as it has recently been fetched successfully.")
-    #     return
-
-    # grab the HTML
-    try:
-        fetched_at = now()
-        html = await fetch_page(mapping)
-    except httpx.TimeoutException:
-        error = (PageErrorTypeEnum.TIMEOUT, None)
-    except PageUnavailableError as e:
-        error = (PageErrorTypeEnum.UNAUHTORIZED, e)
-    except PageNotFoundError:
-        error = (PageErrorTypeEnum.NOT_FOUND, e)
-    except Exception as exc:
-        logger.exception("Unexpected error fetching page: %s", str(exc))
-        error = (PageErrorTypeEnum.INTERNAL_ERROR, None)
-
-    if error:
-        error_type, exc = error
-        await handle_page_error(
-            db_session,
-            url=mapping.url,
-            description=error_type.value,
-            html=getattr(exc, "html", None),
-            raw_data=getattr(exc, "raw_data", None),
-            errors=getattr(exc, "errors", None),
-        )
-        return False
-
-    # process the HTML
-    try:
-        issued_at, data = await mapping.process(html)
-    except ScrapingNotFoundError as e:
-        error = (PageErrorTypeEnum.DATA_NOT_FOUND, e)
-    except ScrapingValidationError as e:
-        error = (PageErrorTypeEnum.DATA_NOT_VALID, e)
-    except ScrapingIssuedAtError as e:
-        error = (PageErrorTypeEnum.ISSUED_NOT_FOUND, e)
-    except Exception as exc:
-        logger.exception("Unexpected error processing page: %s", str(exc))
-        error = (PageErrorTypeEnum.INTERNAL_ERROR, None)
-        return False
-
-    if error:
-        error_type, exc = error
-        await handle_page_error(
-            db_session,
-            url=mapping.url,
-            description=error_type.value,
-            html=getattr(exc, "html", None),
-            raw_data=getattr(exc, "raw_data", None),
-            errors=getattr(exc, "errors", None),
-        )
-        return False
-
-    # XXX in this new style then this would be part of the process function and only errors are handled in this function
-    # page = models.Page(
-    #     url=ptf.url, issued_at=issued_at, raw_data=data, fetched_at=fetched_at
-    # )
-    # db_session.add(page)
-    # await db_session.commit()
-    # return True
-
-    return issued_at, data
-
+from app.scraper.exceptions import (
+    ScrapingIssuedAtError,
+    ScrapingNotFoundError,
+    ScrapingValidationError,
+)
+from app.scraper.schemas import (
+    WeatherObject,
+    process_public_forecast_7_day_schema,
+    process_forecast_schema,
+)
+from app.utils.datetime import as_vu_to_utc
 
 
 ScrapeResult = tuple[datetime, Any]
 
 
-async def scrape_forecast(html: str) -> ScrapeResult:
+def process_issued_at(
+    text: str, delimiter_start: str, delimiter_end: str = "(utc time"
+) -> datetime:
+    """Given a text containing the `issued_at` value found between two delimiters extract the value and convert to a datetime.
+    The general date format appears to be "%a %dXX %B, %Y at %H:%M" where `%dXX` is an ordinal number.
+    Examples:
+     - "Mon 27th March, 2023 at 15:02 (UTC Time:04:02)"
+     - "Tue 28th March, 2023 at 16:05 (UTC Time:05:05)"
+
+    So far I noticed the format of the date appears consistent across pages but the delimiter for the start of the date is inconsistent.
+    """
+    issued_date_str = (
+        text.lower()
+        .split(delimiter_start.lower(), 1)[1]
+        .split(delimiter_end.lower())[0]
+        .strip()
+    )
+    issued_date_str = (
+        issued_date_str[:6] + issued_date_str[8:]
+    )  # remove 'st', 'nd', 'rd', 'th'
+    issued_at = datetime.strptime(issued_date_str, "%a %d %B, %Y at %H:%M")
+    return as_vu_to_utc(issued_at)
+
+
+async def scrape_forecast(html: str) -> tuple[datetime, list[WeatherObject]]:
     """The main forecast page with daily temperature and humidity information and 6 hour
     interval resolution for weather condition, wind speed/direction.
     All information is encoded in a special `<script>` that contains a `var weathers`
@@ -174,6 +78,8 @@ async def scrape_forecast(html: str) -> ScrapeResult:
                 errors.append(v.errors)
         if errors:
             raise ScrapingValidationError(html, weathers, errors)
+        # XXX this makes it hard to serialize into database for `Page` model
+        # weathers = list(map(lambda w: WeatherObject(*w), weathers))
     except SchemaError as exc:
         raise ScrapingValidationError(html, weathers, str(exc))
     # I believe catching a general exception here negates the use of raising the error above
@@ -187,11 +93,7 @@ async def scrape_forecast(html: str) -> ScrapeResult:
         issued_at = process_issued_at(issued_str, "Forecast Issue Date:")
     except (IndexError, ValueError) as exc:
         raise ScrapingIssuedAtError(html)
-    return dict(forecast_detail=dict(
-        issued_at=issued_at,
-        data=weathers,
-    ))
-
+    return issued_at, weathers
 
 
 # Public Forecast
@@ -233,8 +135,6 @@ async def scrape_severe_weather_outlook(html: str) -> ScrapeResult:
 
 async def scrape_public_forecast_tc_outlook(html: str) -> ScrapeResult:
     raise NotImplementedError
-
-
 
 
 async def scrape_public_forecast_7_day(html: str) -> ScrapeResult:
@@ -281,10 +181,7 @@ async def scrape_public_forecast_7_day(html: str) -> ScrapeResult:
         issued_at = process_issued_at(issued_str, "Port Vila at")
     except (IndexError, ValueError):
         raise ScrapingIssuedAtError(html)
-    return dict(forecast_week=dict(
-        issued_at=issued_at,
-        data=forecasts,
-    ))
+    return issued_at, forecasts
 
 
 async def scrape_public_forecast_media(html: str) -> ScrapeResult:
@@ -293,7 +190,7 @@ async def scrape_public_forecast_media(html: str) -> ScrapeResult:
         table = soup.find("table", class_="forecastPublic")
     except:
         raise ScrapingNotFoundError(html)
-    
+
     try:
         images = table.find_all("img")
         assert len(images) > 0, "public forecast media images missing"
@@ -303,7 +200,9 @@ async def scrape_public_forecast_media(html: str) -> ScrapeResult:
     try:
         summary_list = [t for t in table.div.contents if isinstance(t, str)]
         summary_list = list(filter(lambda t: bool(t.strip()), summary_list))
-        summary = " ".join(" ".join([t.replace("\t", "").strip() for t in summary_list]).split("\n"))
+        summary = " ".join(
+            " ".join([t.replace("\t", "").strip() for t in summary_list]).split("\n")
+        )
     except Exception as exc:  # TODO handle expected errors
         raise ScrapingValidationError(html, errors=str(exc))
 

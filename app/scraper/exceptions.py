@@ -1,23 +1,23 @@
 import enum
-from pathlib import Path
 from typing import Any
-import uuid
 
 import httpx
 
-from app.scraper.utils import _save_html
+# currently this causes cyclic errors maybe better to merge all of this code into `pages`
+# from app.vmgd.utils import _save_html
 
 
 class FetchError(Exception):
     def __init__(self, url: str, resp: httpx.Response | None = None) -> None:
         resp_part = ""
         if resp:
-            filename = Path("errors") / str(uuid.uuid4())
-            filepath = _save_html(resp.text, filename)
-            resp_part = f", got HTTP {resp.status_code}, review HTML at {str(filename)}"
+            pass
+            # filename = Path("errors") / str(uuid.uuid4())
+            # filepath = _save_html(resp.text, filename)
+            # resp_part = f", got HTTP {resp.status_code}, review HTML at {str(filename)}"
         message = f"Failed to fetch {url}{resp_part}"
         super().__init__(message)
-        self.html_filepath = filepath
+        # self.html_filepath = filepath
         self.resp = resp
         self.url = url
 
@@ -58,6 +58,7 @@ class ScrapingIssuedAtError(ScrapingError):
     pass
 
 
+# This may be better served from the `pages` file
 class PageErrorTypeEnum(str, enum.Enum):
     TIMEOUT = "TIMEOUT"
     NOT_FOUND = "NOT_FOUND"

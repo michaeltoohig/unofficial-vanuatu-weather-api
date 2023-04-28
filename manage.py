@@ -37,9 +37,9 @@ def dev():
 
 @cli.command()
 def scrape():
-    from app.vmgd.scrape_pages import run_process_all_pages
+    from app.scraper.main import run_process_all_sessions
 
-    anyio.run(run_process_all_pages)
+    anyio.run(run_process_all_sessions)
 
 
 if __name__ == "__main__":
