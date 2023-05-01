@@ -49,10 +49,13 @@ class Page(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     session_id = Column(Integer, ForeignKey("session.id"), nullable=False)
-    issued_at = Column(DateTime(timezone=True), nullable=False)
+    session = relationship("Session", lazy="joined")
 
     path = Column("url", String, nullable=False)
+    issued_at = Column(DateTime(timezone=True), nullable=False)
     _raw_data = Column("json_data", String, nullable=False)
+
+    url = synonym("path")
 
     def __init__(
         self,
@@ -174,11 +177,12 @@ class ForecastDaily(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     session_id = Column(Integer, ForeignKey("session.id"), nullable=False)
+    session = relationship("Session", lazy="joined")
+
+    location_id = Column(Integer, ForeignKey("location.id"), nullable=False)
+    location = relationship("Location", lazy="joined")
 
     issued_at = Column(DateTime(timezone=True), nullable=False)
-    location_id = Column(Integer, ForeignKey("location.id"), nullable=False)
-    location = relationship("Location")
-
     date = Column(DateTime(timezone=True), nullable=False)
     summary = Column(String, nullable=False)
     minTemp = Column(Integer, nullable=False)

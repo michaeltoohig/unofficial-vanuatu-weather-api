@@ -81,7 +81,7 @@ async def process_session_mapping(session_mapping: SessionMapping):
 
     # create session
     async with async_session() as db_session:
-        session = models.Session(session_name=session_mapping.name)
+        session = models.Session(name=session_mapping.name.value)
         db_session.add(session)
         await db_session.commit()
         await db_session.flush()
@@ -119,14 +119,16 @@ async def process_session_mapping(session_mapping: SessionMapping):
 
 async def run_process_all_sessions() -> None:
     """CLI entrypoint."""
-    # headers = {
-    #     "User-Agent": config.USER_AGENT,
-    # }
-    # async with httpx.AsyncClient(headers=headers, timeout=30.0) as client:
-    #     async with anyio.create_task_group() as tg:
-    #         for ptf in pages_to_fetch:
-    #             tg.start_soon(process_page, ptf)
-
     async with anyio.create_task_group() as tg:
         for session_mapping in session_mappings:
             tg.start_soon(process_session_mapping, session_mapping)
+
+
+async def process_all_sessions() -> None:
+    async with anyio.create_task_group() as tg:
+        for session_mapping in session_mappings:
+            tg.start_soon(process_session_mapping, session_mapping)
+
+
+if __name__ == "__main__":
+    anyio.run(process_all_sessions())

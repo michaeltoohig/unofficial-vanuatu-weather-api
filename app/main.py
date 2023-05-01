@@ -1,32 +1,31 @@
-from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 import os
 import sys
 import time
-from typing import List
 
 from asgiref.typing import ASGI3Application
 from asgiref.typing import ASGIReceiveCallable
 from asgiref.typing import ASGISendCallable
 from asgiref.typing import Scope
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, Request, Query
 from fastapi.exceptions import HTTPException
 from fastapi.exception_handlers import http_exception_handler
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
 from starlette.datastructures import Headers, MutableHeaders
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from starlette.responses import JSONResponse
 from starlette.types import Message
-
-
 from sqlalchemy import select
 
-from app import models, templates
+
+from app import models, schemas, templates
 from app.config import DEBUG
 from app.database import AsyncSession, async_session, get_db_session
 from app.forecasts import get_latest_forecast
+from app.locations import get_all_locations
 from app.pages import get_latest_page
+from app.utils.api import VmgdApiResponse, render_vmgd_api_response
 
 
 class CustomMiddleware:
@@ -180,46 +179,62 @@ async def index(
     )
 
 
+@app.get("/v1/locations")
+async def get_locations(
+    requiest: Request,
+    db_session: AsyncSession = Depends(get_db_session),
+) -> list[schemas.LocationResponse]:
+    locations =  await get_all_locations(db_session)
+    return [
+        schemas.LocationResponse(
+            id=l.id,
+            name=l.name,
+            latitude=l.latitude,
+            longitude=l.longitude,
+        )
+        for l in locations
+    ]
+
+
 @app.get("/v1/raw/pages")
 async def raw_pages(
     request: Request,
     db_session: AsyncSession = Depends(get_db_session),
-):
+) -> VmgdApiResponse:
+    # TODO how to allow user to specify page to return? A PageName enum?
     page = await get_latest_page(db_session)
-    # TODO look at using pydantic models to change models into schemas for API
-    # or consider the downsides of manually defining JSON responses as below
-    return {
-        "fetched_at": page.fetched_at,
-        "issued_at": page.issued_at,
-        "url": page.url,
-        "data": page.json_data,
-    }
+    data = schemas.RawPageResponse(
+        url=page.url,
+        data=page.raw_data,
+    )
+    return render_vmgd_api_response(data, issued=page.issued_at, fetched=page.session.fetched_at)
 
 
-@dataclass
-class ForecastResponse:
-    location_id: int
-    issued_at: datetime
-    date: datetime
-    summary: str
-    
-
-
-@app.get("/v1/forecast", response_model=List[ForecastResponse])
+@app.get("/v1/forecast")
 async def forecast(
     request: Request,
     db_session: AsyncSession = Depends(get_db_session),
-):
-    forecast = await get_latest_forecast(db_session, 1)
-    # TODO look at using pydantic/dataclass models to change models into schemas for API
-    # or consider the downsides of manually defining JSON responses as below
-    # return forecast.all()
-    return [
-        {
-            "location_id": f.location_id,
-            "issued_at": f.issued_at,
-            "date": f.date,
-            "summary": f.summary,
-        }
+    *,
+    location_id: int = Query(None, alias="locationId"),
+    dt: date = Query(None, alias="date"),
+) -> VmgdApiResponse:
+    # TODO depends on location id if exists
+    # TODO accept date query params
+    forecast = await get_latest_forecast(db_session, location_id, dt)
+    if not isinstance(forecast, list):
+        forecast = [forecast]
+    data = [
+        schemas.ForecastResponse(
+            location=f.location.id,
+            date=f.date,
+            summary=f.summary,
+            minTemp=f.minTemp,
+            maxTemp=f.maxTemp,
+            minHumi=f.minHumi,
+            maxHumi=f.maxHumi,
+        )
         for f in forecast
     ]
+    issued = forecast[0].issued_at
+    fetched = forecast[0].session.fetched_at
+    return render_vmgd_api_response(data, issued=issued, fetched=fetched)

@@ -6,6 +6,14 @@ from app import models
 from app.database import AsyncSession
 
 
+async def get_all_locations(
+    db_session: AsyncSession,
+) -> list[models.Location]:
+    query = select(models.Location)
+    locations = (await db_session.execute(query)).scalars().all()
+    return locations
+
+
 async def get_location_by_name(
     db_session: AsyncSession,
     name: str | None,
