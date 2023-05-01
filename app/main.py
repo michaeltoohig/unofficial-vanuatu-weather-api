@@ -1,14 +1,12 @@
-import datetime
 import os
 import sys
 import time
-from typing import Annotated
 
 from asgiref.typing import ASGI3Application
 from asgiref.typing import ASGIReceiveCallable
 from asgiref.typing import ASGISendCallable
 from asgiref.typing import Scope
-from fastapi import Depends, FastAPI, Request, Query
+from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import HTTPException
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.responses import JSONResponse
@@ -24,10 +22,10 @@ from app import models, schemas, templates
 from app.config import DEBUG
 from app.database import AsyncSession, async_session, get_db_session
 from app.forecasts import get_latest_forecasts
-from app.locations import LocationDep, get_all_locations, get_location_by_id
+from app.locations import LocationDep, get_all_locations
 from app.pages import get_latest_page
 from app.utils.api import VmgdApiResponse, render_vmgd_api_response
-from app.utils.datetime import DateDep, as_utc
+from app.utils.datetime import DateDep
 
 
 class CustomMiddleware:
@@ -142,7 +140,9 @@ async def custom_http_exception_handler(
     if (
         accept_value
         and accept_value.startswith("text/html")
-        and not request.url.path.startswith("/v1")  # return JSON response for API requests
+        and not request.url.path.startswith(
+            "/v1"
+        )  # return JSON response for API requests
         and 400 <= exc.status_code < 600
     ):
         async with async_session() as db_session:
@@ -187,7 +187,7 @@ async def get_locations(
     requiest: Request,
     db_session: AsyncSession = Depends(get_db_session),
 ) -> list[schemas.LocationResponse]:
-    locations =  await get_all_locations(db_session)
+    locations = await get_all_locations(db_session)
     return [
         schemas.LocationResponse(
             id=l.id,
@@ -210,7 +210,9 @@ async def raw_pages(
         url=page.url,
         data=page.raw_data,
     )
-    return render_vmgd_api_response(data, issued=page.issued_at, fetched=page.session.fetched_at)
+    return render_vmgd_api_response(
+        data, issued=page.issued_at, fetched=page.session.fetched_at
+    )
 
 
 @app.get("/v1/forecast")
