@@ -54,7 +54,7 @@ def convert_to_datetime(date_string: str, issued_at: datetime) -> datetime:
      - the `date_string` is never representing a value greater than 1 month after the `issued_at` date
     """
     day = int(date_string.split()[1])
-    if day <= issued_at.day:
+    if day < issued_at.day:
         # we have wrapped around to a new month/year
         next_month = issued_at + relativedelta(months=1)
         dt = datetime(next_month.year, next_month.month, day)

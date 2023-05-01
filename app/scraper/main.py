@@ -108,11 +108,11 @@ async def process_session_mapping(session_mapping: SessionMapping):
 
             session.completed_at = now()
             db_session.add(session)
-            db_session.flush()
+            await db_session.flush()
     except Exception as exc:
         # handle any errors - maybe add `errors` and `count` to Session table
         # TODO better handling
-        logger.exception("Session failed: %s" % str(exc))
+        logger.exception("Session failed: %s" % str(exc), traceback=True)
     finally:
         pass
 

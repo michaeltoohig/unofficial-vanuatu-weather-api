@@ -63,15 +63,11 @@ class Page(Base):
         raw_data: Any,
         session_id: int,
         issued_at: datetime,
-        fetched_at: datetime | None = None,
     ):
-        if fetched_at is None:
-            fetched_at = now()
         self.path = path
         self.raw_data = raw_data
         self.issued_at = issued_at
         self.session_id = session_id
-        self.fetched_at = fetched_at
 
     @property
     def raw_data(self):
@@ -177,7 +173,7 @@ class ForecastDaily(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     session_id = Column(Integer, ForeignKey("session.id"), nullable=False)
-    session = relationship("Session", lazy="joined")
+    session = relationship("Session", lazy="joined", backref="forecasts")
 
     location_id = Column(Integer, ForeignKey("location.id"), nullable=False)
     location = relationship("Location", lazy="joined")
