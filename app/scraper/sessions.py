@@ -3,8 +3,8 @@
 from dataclasses import dataclass
 import enum
 
-from app.scraper.pages import PageMapping
-from app.scraper.scrapers import scrape_forecast, scrape_public_forecast_7_day
+from app.scraper.pages import PageMapping, PagePath
+from app.scraper.scrapers import scrape_current_bulletin, scrape_forecast, scrape_public_forecast_7_day, scrape_public_forecast_media, scrape_severe_weather_outlook, scrape_severe_weather_warning
 from app.scraper.aggregators import aggregate_forecast_week
 
 
@@ -16,19 +16,35 @@ class SessionMapping:
 
 
 class SessionName(enum.Enum):
-    GENERAL_FORECAST = "forecast_general"
+    FORECAST_GENERAL = "forecast_general"
+    FORECAST_MEDIA = "forecast_media"
+    WARNING_BULLETIN = "warning_bulletin"
+    WARNING_SEVERE_WEATHER = "warning_severe_weather"
 
 
 session_mappings = [
+    # SessionMapping(
+    #     name=SessionName.FORECAST_GENERAL,
+    #     pages=[
+    #         PageMapping(PagePath.FORECAST_MAP, scrape_forecast),
+    #         PageMapping(PagePath.FORECAST_WEEK, scrape_public_forecast_7_day),
+    #     ],
+    #     process=aggregate_forecast_week,
+    # ),
+    # SessionMapping(
+    #     name=SessionName.FORECAST_MEDIA,
+    #     pages=[PageMapping(PagePath.FORECAST_MEDIA, scrape_public_forecast_media)],
+    #     process=None,
+    # ),
+    # SessionMapping(
+    #     name=SessionName.WARNING_BULLETIN,
+    #     pages=[PageMapping(PagePath.WARNING_BULLETIN, scrape_current_bulletin)],
+    #     process=None,
+    # ),
     SessionMapping(
-        name=SessionName.GENERAL_FORECAST,
-        pages=[
-            PageMapping("/forecast-division", scrape_forecast),
-            PageMapping(
-                "/forecast-division/public-forecast/7-day", scrape_public_forecast_7_day
-            ),
-        ],
-        process=aggregate_forecast_week,
+        name=SessionName.WARNING_SEVERE_WEATHER,
+        pages=[PageMapping(PagePath.WARNING_SEVERE_WEATHER, scrape_severe_weather_warning)],
+        process=None,
     ),
 ]
 

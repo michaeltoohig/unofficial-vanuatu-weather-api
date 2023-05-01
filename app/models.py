@@ -2,7 +2,7 @@ from datetime import datetime
 import json
 from pathlib import Path
 from tkinter import N
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship, synonym
@@ -13,6 +13,9 @@ from app.database import Base
 
 # from app.scraper.sessions import SessionName
 from app.utils.datetime import now
+
+if TYPE_CHECKING:
+    from app.scraper.pages import PagePath
 
 
 class Session(Base):
@@ -51,7 +54,7 @@ class Page(Base):
     session_id = Column(Integer, ForeignKey("session.id"), nullable=False)
     session = relationship("Session", lazy="joined")
 
-    path = Column("url", String, nullable=False)
+    _path = Column("url", String, nullable=False)
     issued_at = Column(DateTime(timezone=True), nullable=False)
     _raw_data = Column("json_data", String, nullable=False)
 
@@ -59,12 +62,12 @@ class Page(Base):
 
     def __init__(
         self,
-        path: str,
+        path: "PagePath",
         raw_data: Any,
         session_id: int,
         issued_at: datetime,
     ):
-        self.path = path
+        self._path = path.value
         self.raw_data = raw_data
         self.issued_at = issued_at
         self.session_id = session_id
@@ -188,3 +191,17 @@ class ForecastDaily(Base):
     # below values are available in 6 hour increments so we would have to calculate a daily average for each
     # windSpeed = Column(Integer, nullable=False)
     # windDir = Column(Float, nullable=False)
+
+
+# class Warnings(Base):
+#     __tablename__ = "warnings"
+
+#     id = Column(Integer, primary_key=True, index=True)
+#     session_id = Column(Integer, ForeignKey("session.id"), nullable=False)
+#     session = relationship("Session", lazy="joined")  #, backref="warnings")
+
+#     category = Column(String, nullable=False)  # the slug of the page
+    
+#     issued_at = Column(DateTime(timezone=True), nullable=False)
+#     date = Column(DateTime(timezone=True), nullable=False)
+#     description = Column(String, nullable=False)

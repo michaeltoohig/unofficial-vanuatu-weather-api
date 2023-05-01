@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import enum
 import hashlib
 import json
 from sqlalchemy import select
@@ -11,20 +12,28 @@ from app.utils.datetime import now
 from app.scraper.utils import _save_html
 
 
+class PagePath(enum.Enum):
+    FORECAST_MAP = "/forecast-division"
+    FORECAST_WEEK = "/forecast-division/public-forecast/7-day"
+    FORECAST_MEDIA = "/forecast-division/public-forecast/media"
+    WARNING_BULLETIN = "/forecast-division/warnings/current-bulletin"
+    WARNING_SEVERE_WEATHER = "/forecast-division/warnings/severe-weather-warning"
+
+
 @dataclass
 class PageMapping:
-    path: str
+    path: PagePath
     process: callable
     scraper: callable = None
     # process_images: callable | None  # TODO decide how to handle pages that have images.
 
     @property
     def url(self):
-        return config.VMGD_BASE_URL + self.path
+        return config.VMGD_BASE_URL + self.path.value
 
     @property
     def slug(self):
-        return self.path.rsplit("/", 1)[1]
+        return self.path.value.rsplit("/", 1)[1]
 
 
 async def handle_page_error(

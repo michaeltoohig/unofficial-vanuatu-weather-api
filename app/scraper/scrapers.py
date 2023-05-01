@@ -8,6 +8,7 @@ from cerberus import Validator, SchemaError
 from loguru import logger
 
 from app.scraper.exceptions import (
+    ScrapingError,
     ScrapingIssuedAtError,
     ScrapingNotFoundError,
     ScrapingValidationError,
@@ -188,6 +189,7 @@ async def scrape_public_forecast_media(html: str) -> ScrapeResult:
     soup = BeautifulSoup(html, "html.parser")
     try:
         table = soup.find("table", class_="forecastPublic")
+        # TODO confirm this will silently fail as it will return None not raise
     except:
         raise ScrapingNotFoundError(html)
 
@@ -221,25 +223,58 @@ async def scrape_public_forecast_media(html: str) -> ScrapeResult:
 
 
 async def scrape_current_bulletin(html: str) -> ScrapeResult:
-    raise NotImplementedError
     soup = BeautifulSoup(html, "html.parser")
-    warning_div = soup.find("div", class_="foreWarning")
-    if warning_div.text.lower().strip() == "there is no latest warning":
-        # no warnings
-        pass
-    else:
-        # has warnings
-        pass
+    try:
+        warning_div = soup.find("div", class_="foreWarning")
+    except:
+        raise ScrapingNotFoundError(html)
 
+    if warning_div.text.lower().strip() == "there is no latest warning":
+        return None, None  # no issued_at and no warnings
+    else:
+        raise NotImplementedError
+        # has warnings
+        # need example to implement
+        pass
 
 async def scrape_severe_weather_warning(html: str) -> ScrapeResult:
     # TODO extract data from table with class `marineFrontTabOne`
-    raise NotImplementedError
+    soup = BeautifulSoup(html, "html.parser")
+    try:
+        warnings_table = soup.find("table", class_="marineFrontTabOne")
+        if not warnings_table:
+            article = soup.find("p", class_="weatherBulletin").find_parent("article", class_="item-page")
+            assert article is not None
+            assert "no current warning" in article.text.lower().strip()
+            return None, None  # no issued_at as no warnings available
+    except:
+        raise ScrapingNotFoundError(html)
+
+    # grab issued at datetime
+    try:
+        issued_str = (
+            warnings_table.find("tr").text.lower().strip().replace("\t", "").replace("\n", " ").replace("\xa0", "")
+        )
+        # TODO handle full DoW names such as Monday, not only Mon
+        issued_at = process_issued_at(issued_str, "report issued at")
+    except (IndexError, ValueError):
+        raise ScrapingIssuedAtError(html)
+    
+    import pdb; pdb.set_trace()  # fmt: skip
+    pass
+
 
 
 async def scrape_marine_waring(html: str) -> ScrapeResult:
     # TODO extract data from table with class `marineFrontTabOne`
     raise NotImplementedError
+    soup = BeautifulSoup(html, "html.parser")
+    try:
+        warning_div = soup.find("div", class_="marineFrontTabOne")
+    except:
+        raise ScrapingNotFoundError(html)
+
+    
 
 
 async def scrape_hight_seas_warning(html: str) -> ScrapeResult:
