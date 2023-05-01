@@ -1,17 +1,15 @@
 from datetime import datetime
-import json
 from typing import Any
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, field
 
-from fastapi import Request, status
-from fastapi.responses import JSONResponse
+from app import config
 
 
 @dataclass
 class VmgdApiResponseMeta:
     issued: datetime
     fetched: datetime
-    attribution: str = field(default="This default attribution to be in config later")
+    attribution: str = field(default=config.VMGD_ATTRIBUTION)
 
 
 @dataclass

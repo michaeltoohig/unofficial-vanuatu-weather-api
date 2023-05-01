@@ -1,7 +1,8 @@
-from datetime import date, datetime
+import datetime
 import os
 import sys
 import time
+from typing import Annotated
 
 from asgiref.typing import ASGI3Application
 from asgiref.typing import ASGIReceiveCallable
@@ -22,10 +23,11 @@ from sqlalchemy import select
 from app import models, schemas, templates
 from app.config import DEBUG
 from app.database import AsyncSession, async_session, get_db_session
-from app.forecasts import get_latest_forecast
-from app.locations import get_all_locations
+from app.forecasts import get_latest_forecasts
+from app.locations import LocationDep, get_all_locations, get_location_by_id
 from app.pages import get_latest_page
 from app.utils.api import VmgdApiResponse, render_vmgd_api_response
+from app.utils.datetime import DateDep, as_utc
 
 
 class CustomMiddleware:
@@ -140,6 +142,7 @@ async def custom_http_exception_handler(
     if (
         accept_value
         and accept_value.startswith("text/html")
+        and not request.url.path.startswith("/v1")  # return JSON response for API requests
         and 400 <= exc.status_code < 600
     ):
         async with async_session() as db_session:
@@ -215,14 +218,12 @@ async def forecast(
     request: Request,
     db_session: AsyncSession = Depends(get_db_session),
     *,
-    location_id: int = Query(None, alias="locationId"),
-    dt: date = Query(None, alias="date"),
+    location: LocationDep,
+    dt: DateDep,
 ) -> VmgdApiResponse:
-    # TODO depends on location id if exists
-    # TODO accept date query params
-    forecast = await get_latest_forecast(db_session, location_id, dt)
-    if not isinstance(forecast, list):
-        forecast = [forecast]
+    forecasts = await get_latest_forecasts(db_session, location, dt)
+    if not forecasts:
+        raise HTTPException(status_code=404, detail="No forecast data available")
     data = [
         schemas.ForecastResponse(
             location=f.location.id,
@@ -233,8 +234,8 @@ async def forecast(
             minHumi=f.minHumi,
             maxHumi=f.maxHumi,
         )
-        for f in forecast
+        for f in forecasts
     ]
-    issued = forecast[0].issued_at
-    fetched = forecast[0].session.fetched_at
+    issued = forecasts[0].issued_at
+    fetched = forecasts[0].session.fetched_at
     return render_vmgd_api_response(data, issued=issued, fetched=fetched)
