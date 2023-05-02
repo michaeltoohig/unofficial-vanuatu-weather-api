@@ -243,10 +243,12 @@ async def scrape_severe_weather_warning(html: str) -> ScrapeResult:
     try:
         warnings_table = soup.find("table", class_="marineFrontTabOne")
         if not warnings_table:
+            logger.debug("No warnings table found")
             article = soup.find("p", class_="weatherBulletin").find_parent("article", class_="item-page")
             assert article is not None
             assert "no current warning" in article.text.lower().strip()
-            return None, None  # no issued_at as no warnings available
+            logger.info("No current warnings reported")
+            return -1, "no current warning"  # no issued_at as no warnings available
     except:
         raise ScrapingNotFoundError(html)
 

@@ -90,11 +90,13 @@ async def process_session_mapping(session_mapping: SessionMapping):
     # process page set -- do work
     try:
         async with async_session() as db_session, db_session.begin():
-            set_data = []
-            # TODO fetch each url async like in trio nursery perhaps
+            pages = []
+            # TODO fetch each url async in task group
             for mapping in session_mapping.pages:
                 logger.info(f"page url {mapping.url}")
                 issued_at, raw_data = await process_page_mapping(db_session, mapping)
+                if issued_at == -1:  # warning page did not provide issued_at
+                    issued_at = session.fetched_at
                 page = models.Page(
                     path=mapping.path,
                     raw_data=raw_data,
@@ -102,9 +104,9 @@ async def process_session_mapping(session_mapping: SessionMapping):
                     issued_at=issued_at,
                 )
                 db_session.add(page)
-                set_data.append(page)
+                pages.append(page)
 
-            await session_mapping.process(db_session, session, set_data)
+            await session_mapping.process(db_session, session, pages)
 
             session.completed_at = now()
             db_session.add(session)

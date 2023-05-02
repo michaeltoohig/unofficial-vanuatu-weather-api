@@ -66,7 +66,7 @@ def convert_to_datetime(date_string: str, issued_at: datetime) -> datetime:
 async def aggregate_forecast_week(
     db_session: AsyncSession, session: Session, pages: list[Page]
 ):
-    """Handles forecast forecast data which currently comprises of 7-day forecast and 3 day forecast.
+    """Handles data which currently comprises of 7-day forecast and 3 day forecast.
     Together the two pages can form a coherent weekly forecast."""
     location_cache = {}
 
@@ -109,3 +109,13 @@ async def aggregate_forecast_week(
             forecast.issued_at = issued_at
             forecast.session_id = session.id
             db_session.add(forecast)
+
+
+async def aggregate_severe_weather_warning(db_session: AsyncSession, session: Session, pages: list[Page]):
+    """Handles data from the severe weather warnings."""
+    data = pages[0].raw_data
+    if data == "no current warning":  # TODO use a constant
+        # TODO handle no warning
+        return
+    
+    # TODO handle warnings data

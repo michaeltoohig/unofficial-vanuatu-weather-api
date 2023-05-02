@@ -5,7 +5,7 @@ import enum
 
 from app.scraper.pages import PageMapping, PagePath
 from app.scraper.scrapers import scrape_current_bulletin, scrape_forecast, scrape_public_forecast_7_day, scrape_public_forecast_media, scrape_severe_weather_outlook, scrape_severe_weather_warning
-from app.scraper.aggregators import aggregate_forecast_week
+from app.scraper.aggregators import aggregate_forecast_week, aggregate_severe_weather_warning
 
 
 @dataclass
@@ -44,7 +44,7 @@ session_mappings = [
     SessionMapping(
         name=SessionName.WARNING_SEVERE_WEATHER,
         pages=[PageMapping(PagePath.WARNING_SEVERE_WEATHER, scrape_severe_weather_warning)],
-        process=None,
+        process=aggregate_severe_weather_warning,
     ),
 ]
 
