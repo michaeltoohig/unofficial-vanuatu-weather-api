@@ -58,14 +58,12 @@ async def handle_page_error(
         models.PageError.exception == exc,
     )
     if html_hash is not None:
+        json_str_raw_data = json.dumps(raw_data) if raw_data is not None else None
+        json_str_errors= json.dumps(errors) if errors is not None else None
         query = query.where(
             models.PageError.html_hash == html_hash,
-            models.PageError._raw_data == json.dumps(raw_data)
-            if raw_data is not None
-            else None,
-            models.PageError._errors == json.dumps(errors)
-            if errors is not None
-            else None,
+            models.PageError._raw_data == json_str_raw_data,
+            models.PageError._errors == json_str_errors,
         )
     result = await db_session.execute(query.limit(1))
     existing = result.scalars().one_or_none()

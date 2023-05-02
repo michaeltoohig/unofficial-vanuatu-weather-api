@@ -10,6 +10,7 @@ from app.database import AsyncSession
 from app.locations import save_forecast_location
 from app.models import ForecastDaily, Location, Page, Session
 from app.scraper.schemas import WeatherObject
+from app.utils.datetime import as_vu_to_utc
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -111,11 +112,34 @@ async def aggregate_forecast_week(
             db_session.add(forecast)
 
 
+
+def convert_warning_at_to_datetime(text: str, delimiter_start: str = ": ") -> datetime:
+    """Convert warning date string to datetime.
+    Examples:
+     - "Friday 24th March, 2023"
+     - "Tuesday 2nd May, 2023"
+    """
+    # Prep the string
+    issued_date_str = (
+        text.lower()
+        .split(delimiter_start.lower(), 1)[1]
+        .strip()
+    )
+    issued_date_parts = issued_date_str.split()
+    issued_day = issued_date_parts[1][:-2]  # remove 'st', 'nd', 'rd', 'th'
+    issued_date_parts[1] = issued_day
+    issued_date_str = " ".join(issued_date_parts)
+    # Parse the string
+    issued_at = datetime.strptime(issued_date_str, f"%A %d %B, %Y")
+    return as_vu_to_utc(issued_at)
+
+
 async def aggregate_severe_weather_warning(db_session: AsyncSession, session: Session, pages: list[Page]):
     """Handles data from the severe weather warnings."""
     data = pages[0].raw_data
     if data == "no current warning":  # TODO use a constant
         # TODO handle no warning
         return
-    
-    # TODO handle warnings data
+    import pdb; pdb.set_trace()  # fmt: skip
+    pass
+    # TODO handle warnings data use convert warning at to datetime on waring dict date key and insert into yet to exist Warnings table

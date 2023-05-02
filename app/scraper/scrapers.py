@@ -24,6 +24,10 @@ from app.utils.datetime import as_vu_to_utc
 ScrapeResult = tuple[datetime, Any]
 
 
+def strip_html_text(text: str):
+    return text.strip().replace("\n", " ").replace("\t", "").replace("\xa0", "")
+
+
 def process_issued_at(
     text: str, delimiter_start: str, delimiter_end: str = "(utc time"
 ) -> datetime:
@@ -32,19 +36,25 @@ def process_issued_at(
     Examples:
      - "Mon 27th March, 2023 at 15:02 (UTC Time:04:02)"
      - "Tue 28th March, 2023 at 16:05 (UTC Time:05:05)"
+     - "Friday 24th March, 2023 at 17:43 (UTC Time:06:43)"
+     - "Tuesday 2nd May, 2023 at 17:27 (UTC Time:06:27)"
 
     So far I noticed the format of the date appears consistent across pages but the delimiter for the start of the date is inconsistent.
     """
+    # Prep the string
     issued_date_str = (
         text.lower()
         .split(delimiter_start.lower(), 1)[1]
         .split(delimiter_end.lower())[0]
         .strip()
     )
-    issued_date_str = (
-        issued_date_str[:6] + issued_date_str[8:]
-    )  # remove 'st', 'nd', 'rd', 'th'
-    issued_at = datetime.strptime(issued_date_str, "%a %d %B, %Y at %H:%M")
+    issued_date_parts = issued_date_str.split()
+    issued_day = issued_date_parts[1][:-2]  # remove 'st', 'nd', 'rd', 'th'
+    issued_date_parts[1] = issued_day
+    issued_date_str = " ".join(issued_date_parts)
+    # Parse the string
+    day_fmt = "%A" if "day" in issued_date_parts[0] else "%a"
+    issued_at = datetime.strptime(issued_date_str, f"{day_fmt} %d %B, %Y at %H:%M")
     return as_vu_to_utc(issued_at)
 
 
@@ -177,7 +187,7 @@ async def scrape_public_forecast_7_day(html: str) -> ScrapeResult:
     # grab issued at datetime
     try:
         issued_str = (
-            soup.article.find("table").find_previous_sibling("strong").text.lower()
+            strip_html_text(soup.article.find("table").find_previous_sibling("strong").text)
         )
         issued_at = process_issued_at(issued_str, "Port Vila at")
     except (IndexError, ValueError):
@@ -221,7 +231,6 @@ async def scrape_public_forecast_media(html: str) -> ScrapeResult:
 # Warnings
 ##########
 
-
 async def scrape_current_bulletin(html: str) -> ScrapeResult:
     soup = BeautifulSoup(html, "html.parser")
     try:
@@ -237,9 +246,10 @@ async def scrape_current_bulletin(html: str) -> ScrapeResult:
         # need example to implement
         pass
 
+
 async def scrape_severe_weather_warning(html: str) -> ScrapeResult:
-    # TODO extract data from table with class `marineFrontTabOne`
     soup = BeautifulSoup(html, "html.parser")
+    # grab data for each warning from table
     try:
         warnings_table = soup.find("table", class_="marineFrontTabOne")
         if not warnings_table:
@@ -249,22 +259,29 @@ async def scrape_severe_weather_warning(html: str) -> ScrapeResult:
             assert "no current warning" in article.text.lower().strip()
             logger.info("No current warnings reported")
             return -1, "no current warning"  # no issued_at as no warnings available
+        else:
+            logger.info("warnings table found")
+            current_warnings = []
+            cw_tablerows = warnings_table.find_all("tr")
+            assert len(cw_tablerows) % 2 == 0
+            for idx in range(2, len(warnings_table.find_all("tr")), 2):  # start=2 to skip issued_at rows
+                warn_date_str = strip_html_text(cw_tablerows[idx].text)
+                warn_body = strip_html_text(cw_tablerows[idx + 1].text)
+                current_warnings.append(dict(
+                    date=warn_date_str,
+                    body=warn_body,
+                ))
     except:
         raise ScrapingNotFoundError(html)
 
     # grab issued at datetime
     try:
-        issued_str = (
-            warnings_table.find("tr").text.lower().strip().replace("\t", "").replace("\n", " ").replace("\xa0", "")
-        )
-        # TODO handle full DoW names such as Monday, not only Mon
+        issued_str = strip_html_text(warnings_table.find("tr").text)
         issued_at = process_issued_at(issued_str, "report issued at")
     except (IndexError, ValueError):
         raise ScrapingIssuedAtError(html)
-    
-    import pdb; pdb.set_trace()  # fmt: skip
-    pass
 
+    return issued_at, current_warnings
 
 
 async def scrape_marine_waring(html: str) -> ScrapeResult:

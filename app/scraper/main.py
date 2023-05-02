@@ -107,6 +107,7 @@ async def process_session_mapping(session_mapping: SessionMapping):
                 pages.append(page)
 
             await session_mapping.process(db_session, session, pages)
+            import pdb; pdb.set_trace()  # fmt: skip
 
             session.completed_at = now()
             db_session.add(session)

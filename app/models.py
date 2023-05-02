@@ -140,7 +140,10 @@ class PageError(Base):
 
     @raw_data.setter
     def raw_data(self, obj):
-        self._raw_data = json.dumps(obj)
+        if obj is None:
+            self._raw_data = None
+        else:
+            self._raw_data = json.dumps(obj)
 
     @property
     def errors(self):
@@ -148,7 +151,10 @@ class PageError(Base):
 
     @errors.setter
     def errors(self, obj):
-        self._errors = json.dumps(obj)
+        if obj is None:
+            self._errors = None
+        else:
+            self._errors = json.dumps(obj)
 
 
 class Location(Base):
@@ -200,7 +206,7 @@ class ForecastDaily(Base):
 #     session_id = Column(Integer, ForeignKey("session.id"), nullable=False)
 #     session = relationship("Session", lazy="joined")  #, backref="warnings")
 
-#     category = Column(String, nullable=False)  # the slug of the page
+#     category = Column(String, nullable=False)  # the slug of the page or just use the SessionName
     
 #     issued_at = Column(DateTime(timezone=True), nullable=False)
 #     date = Column(DateTime(timezone=True), nullable=False)
