@@ -241,3 +241,26 @@ async def forecast(
     issued = forecasts[0].issued_at
     fetched = forecasts[0].session.fetched_at
     return render_vmgd_api_response(data, issued=issued, fetched=fetched)
+
+
+@app.get("/v1/warnings")
+async def warnings_(
+    request: Request,
+    db_session: AsyncSession = Depends(get_db_session),
+    *,
+    dt: DateDep,
+) -> VmgdApiResponse:
+    # TODO continue from here
+    ws = await get_latest_warnings(db_session, dt)
+    if not ws:
+        raise HTTPException(status_code=404, detail="No warnings data available")
+    data = [
+        schemas.WarningsResponse(
+            date=w.date,
+            body=w.body,
+        )
+        for w in ws
+    ]
+    issued = ws[0].issued_at
+    fetched = ws[0].session.fetched-at
+    return render_vmgd_api_response(data, issued=issued, fetched=fetched)

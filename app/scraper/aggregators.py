@@ -8,9 +8,9 @@ from loguru import logger
 
 from app.database import AsyncSession
 from app.locations import save_forecast_location
-from app.models import ForecastDaily, Location, Page, Session
-from app.scraper.schemas import WeatherObject
-from app.utils.datetime import as_vu_to_utc
+from app.models import ForecastDaily, Location, Page, Session, Warnings
+from app.scraper.schemas import WeatherObject, WarningObject
+from app.utils.datetime import as_vu_to_utc, now
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -61,7 +61,7 @@ def convert_to_datetime(date_string: str, issued_at: datetime) -> datetime:
         dt = datetime(next_month.year, next_month.month, day)
     else:
         dt = datetime(issued_at.year, issued_at.month, day)
-    return dt
+    return as_vu_to_utc(dt)
 
 
 async def aggregate_forecast_week(
@@ -112,6 +112,11 @@ async def aggregate_forecast_week(
             db_session.add(forecast)
 
 
+@dataclass(frozen=True, kw_only=True)
+class WarningCreate:
+    date: datetime
+    body: str
+
 
 def convert_warning_at_to_datetime(text: str, delimiter_start: str = ": ") -> datetime:
     """Convert warning date string to datetime.
@@ -136,10 +141,20 @@ def convert_warning_at_to_datetime(text: str, delimiter_start: str = ": ") -> da
 
 async def aggregate_severe_weather_warning(db_session: AsyncSession, session: Session, pages: list[Page]):
     """Handles data from the severe weather warnings."""
-    data = pages[0].raw_data
-    if data == "no current warning":  # TODO use a constant
+    # TODO convert warning_ojects to a proper object like a dataclass before it arrives here?
+    issued_at = pages[0].issued_at
+    raw_data = pages[0].raw_data
+    # warning_object = WarningObject(*pages[0].raw_data)
+    if raw_data == "no current warning":  # TODO use a constant
         # TODO handle no warning
+        new_warning = Warnings(date=now(), body=raw_data, issued_at=issued_at, session_id=session.id)
+        db_session.add(new_warning)
         return
-    import pdb; pdb.set_trace()  # fmt: skip
-    pass
-    # TODO handle warnings data use convert warning at to datetime on waring dict date key and insert into yet to exist Warnings table
+
+    for warning_object in raw_data:
+        date = convert_warning_at_to_datetime(warning_object["date"])
+        warning_create = WarningCreate(date=date, body=warning_object["body"])
+        new_warning = Warnings(**asdict(warning_create))
+        new_warning.issued_at = issued_at
+        new_warning.session_id = session.id
+        db_session.add(new_warning)

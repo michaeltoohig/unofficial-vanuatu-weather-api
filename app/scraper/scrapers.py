@@ -231,6 +231,7 @@ async def scrape_public_forecast_media(html: str) -> ScrapeResult:
 # Warnings
 ##########
 
+
 async def scrape_current_bulletin(html: str) -> ScrapeResult:
     soup = BeautifulSoup(html, "html.parser")
     try:

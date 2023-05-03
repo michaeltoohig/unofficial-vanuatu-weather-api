@@ -199,15 +199,20 @@ class ForecastDaily(Base):
     # windDir = Column(Float, nullable=False)
 
 
-# class Warnings(Base):
-#     __tablename__ = "warnings"
+class Warnings(Base):
+    __tablename__ = "warnings"
 
-#     id = Column(Integer, primary_key=True, index=True)
-#     session_id = Column(Integer, ForeignKey("session.id"), nullable=False)
-#     session = relationship("Session", lazy="joined")  #, backref="warnings")
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("session.id"), nullable=False)
+    session = relationship("Session", lazy="joined")  #, backref="warnings")
 
-#     category = Column(String, nullable=False)  # the slug of the page or just use the SessionName
+    # category = Column(String, nullable=False)  # the slug of the page or just use the SessionName
     
-#     issued_at = Column(DateTime(timezone=True), nullable=False)
-#     date = Column(DateTime(timezone=True), nullable=False)
-#     description = Column(String, nullable=False)
+    issued_at = Column(DateTime(timezone=True), nullable=False)
+    date = Column(DateTime(timezone=True), nullable=False)
+    body = Column(String, nullable=False)
+
+    # @property
+    # def category(self):
+    #     # TODO use a `property` on session to avoid `_name` 
+    #     return self.session._name

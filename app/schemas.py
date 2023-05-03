@@ -26,3 +26,9 @@ class ForecastResponse:
     maxTemp: int
     minHumi: int
     maxHumi: int
+
+
+@dataclass
+class WarningResponse:
+    date: datetime
+    body: str
