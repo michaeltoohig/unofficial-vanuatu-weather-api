@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Any
 from datetime import datetime
 import json
@@ -18,14 +19,15 @@ from app.scraper.schemas import (
     process_public_forecast_7_day_schema,
     process_forecast_schema,
 )
+from app.scraper.utils import strip_html_text
 from app.utils.datetime import as_vu_to_utc
 
 
-ScrapeResult = tuple[datetime, Any]
-
-
-def strip_html_text(text: str):
-    return text.strip().replace("\n", " ").replace("\t", "").replace("\xa0", "")
+@dataclass
+class ScrapeResult:
+    raw_data: Any | None = None
+    issued_at: datetime | None = None
+    images: list[str] | None = None
 
 
 def process_issued_at(
@@ -58,7 +60,7 @@ def process_issued_at(
     return as_vu_to_utc(issued_at)
 
 
-async def scrape_forecast(html: str) -> tuple[datetime, list[WeatherObject]]:
+async def scrape_forecast(html: str) -> ScrapeResult:
     """The main forecast page with daily temperature and humidity information and 6 hour
     interval resolution for weather condition, wind speed/direction.
     All information is encoded in a special `<script>` that contains a `var weathers`
@@ -104,7 +106,7 @@ async def scrape_forecast(html: str) -> tuple[datetime, list[WeatherObject]]:
         issued_at = process_issued_at(issued_str, "Forecast Issue Date:")
     except (IndexError, ValueError) as exc:
         raise ScrapingIssuedAtError(html)
-    return issued_at, weathers
+    return ScrapeResult(raw_data=weathers, issued_at=issued_at)
 
 
 # Public Forecast
@@ -186,13 +188,13 @@ async def scrape_public_forecast_7_day(html: str) -> ScrapeResult:
 
     # grab issued at datetime
     try:
-        issued_str = (
-            strip_html_text(soup.article.find("table").find_previous_sibling("strong").text)
+        issued_str = strip_html_text(
+            soup.article.find("table").find_previous_sibling("strong").text
         )
         issued_at = process_issued_at(issued_str, "Port Vila at")
     except (IndexError, ValueError):
         raise ScrapingIssuedAtError(html)
-    return issued_at, forecasts
+    return ScrapeResult(raw_data=forecasts, issued_at=issued_at)
 
 
 async def scrape_public_forecast_media(html: str) -> ScrapeResult:
@@ -213,34 +215,41 @@ async def scrape_public_forecast_media(html: str) -> ScrapeResult:
         summary_list = [t for t in table.div.contents if isinstance(t, str)]
         summary_list = list(filter(lambda t: bool(t.strip()), summary_list))
         summary = " ".join(
-            " ".join([t.replace("\t", "").strip() for t in summary_list]).split("\n")
+            " ".join([strip_html_text(t) for t in summary_list]).split("\n")
         )
     except Exception as exc:  # TODO handle expected errors
         raise ScrapingValidationError(html, errors=str(exc))
 
     try:
-        issued_str = table.div.find_all("div")[1].text.strip().split(" at ", 1)[1]
+        issued_str = strip_html_text(table.div.find_all("div")[1].text).split(
+            " at ", 1
+        )[1]
         issued_at = datetime.strptime(issued_str, "%H:%M %p,\xa0%A %B %d %Y")
         issued_at = as_vu_to_utc(issued_at)
     except (IndexError, ValueError) as exc:
         raise ScrapingIssuedAtError(html, errors=str(exc))
 
-    return issued_at, summary, images
+    return ScrapeResult(raw_data=summary, issued_at=issued_at, images=images)
 
 
 # Warnings
 ##########
 
+NO_CURRENT_WARNING = "no current warning"
+NoCurrentWarningsResult = ScrapeResult(raw_data=NO_CURRENT_WARNING)
+
 
 async def scrape_current_bulletin(html: str) -> ScrapeResult:
+    """Special bulletin board for warnins that seems to have a unique layout compared to the other warning pages.
+    I do not have an example of warnings yet so I can not implement it yet."""
     soup = BeautifulSoup(html, "html.parser")
     try:
         warning_div = soup.find("div", class_="foreWarning")
     except:
         raise ScrapingNotFoundError(html)
 
-    if warning_div.text.lower().strip() == "there is no latest warning":
-        return None, None  # no issued_at and no warnings
+    if strip_html_text(warning_div.text) == "there is no latest warning":
+        return NoCurrentWarningsResult
     else:
         raise NotImplementedError
         # has warnings
@@ -248,32 +257,42 @@ async def scrape_current_bulletin(html: str) -> ScrapeResult:
         pass
 
 
-async def scrape_severe_weather_warning(html: str) -> ScrapeResult:
+async def scrape_weather_warnings(html: str) -> ScrapeResult:
     soup = BeautifulSoup(html, "html.parser")
     # grab data for each warning from table
     try:
         warnings_table = soup.find("table", class_="marineFrontTabOne")
         if not warnings_table:
             logger.debug("No warnings table found")
-            article = soup.find("p", class_="weatherBulletin").find_parent("article", class_="item-page")
-            assert article is not None
-            assert "no current warning" in article.text.lower().strip()
-            logger.info("No current warnings reported")
-            return -1, "no current warning"  # no issued_at as no warnings available
+            article = soup.find("p", class_="weatherBulletin").find_parent(
+                "article", class_="item-page"
+            )
+            assert article is not None, "Expected html article is not found"
+            assert (
+                "no current warning" in strip_html_text(article.text).lower()
+            ), "Expected `no current warning` in text"
+            logger.info("No current warning reported")
+            return NoCurrentWarningsResult
         else:
             logger.info("warnings table found")
             current_warnings = []
             cw_tablerows = warnings_table.find_all("tr")
-            assert len(cw_tablerows) % 2 == 0
-            for idx in range(2, len(warnings_table.find_all("tr")), 2):  # start=2 to skip issued_at rows
+            assert (
+                len(cw_tablerows) % 2 == 0
+            ), "Expected even number of warning rows in table"
+            for idx in range(
+                2, len(warnings_table.find_all("tr")), 2
+            ):  # start=2 to skip issued_at rows
                 warn_date_str = strip_html_text(cw_tablerows[idx].text)
                 warn_body = strip_html_text(cw_tablerows[idx + 1].text)
-                current_warnings.append(dict(
-                    date=warn_date_str,
-                    body=warn_body,
-                ))
-    except:
-        raise ScrapingNotFoundError(html)
+                current_warnings.append(
+                    dict(
+                        date=warn_date_str,
+                        body=warn_body,
+                    )
+                )
+    except Exception as exc:
+        raise ScrapingNotFoundError(html, errors=str(exc))
 
     # grab issued at datetime
     try:
@@ -282,21 +301,4 @@ async def scrape_severe_weather_warning(html: str) -> ScrapeResult:
     except (IndexError, ValueError):
         raise ScrapingIssuedAtError(html)
 
-    return issued_at, current_warnings
-
-
-async def scrape_marine_waring(html: str) -> ScrapeResult:
-    # TODO extract data from table with class `marineFrontTabOne`
-    raise NotImplementedError
-    soup = BeautifulSoup(html, "html.parser")
-    try:
-        warning_div = soup.find("div", class_="marineFrontTabOne")
-    except:
-        raise ScrapingNotFoundError(html)
-
-    
-
-
-async def scrape_hight_seas_warning(html: str) -> ScrapeResult:
-    # TODO extract data from `<article class="item-page">` and handle no warnings by text `NO CURRENT WARNING`
-    raise NotImplementedError
+    return ScrapeResult(raw_data=current_warnings, issued_at=issued_at)

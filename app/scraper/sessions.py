@@ -1,11 +1,19 @@
-
-
 from dataclasses import dataclass
 import enum
 
 from app.scraper.pages import PageMapping, PagePath
-from app.scraper.scrapers import scrape_current_bulletin, scrape_forecast, scrape_public_forecast_7_day, scrape_public_forecast_media, scrape_severe_weather_outlook, scrape_severe_weather_warning
-from app.scraper.aggregators import aggregate_forecast_week, aggregate_severe_weather_warning
+from app.scraper.scrapers import (
+    scrape_current_bulletin,
+    scrape_forecast,
+    scrape_public_forecast_7_day,
+    scrape_public_forecast_media,
+    scrape_severe_weather_outlook,
+    scrape_weather_warnings,
+)
+from app.scraper.aggregators import (
+    aggregate_forecast_week,
+    aggregate_weather_warnings,
+)
 
 
 @dataclass
@@ -19,7 +27,17 @@ class SessionName(enum.Enum):
     FORECAST_GENERAL = "forecast_general"
     FORECAST_MEDIA = "forecast_media"
     WARNING_BULLETIN = "warning_bulletin"
+    WARNING_MARINE = "warning_marine"
+    WARNING_HIGHT_SEAS = "warning_hight_seas"
     WARNING_SEVERE_WEATHER = "warning_severe_weather"
+
+
+WEATHER_WARNING_SESSIONS = [
+    SessionName.WARNING_BULLETIN,
+    SessionName.WARNING_MARINE,
+    SessionName.WARNING_HIGHT_SEAS,
+    SessionName.WARNING_SEVERE_WEATHER,
+]
 
 
 session_mappings = [
@@ -40,11 +58,21 @@ session_mappings = [
     #     name=SessionName.WARNING_BULLETIN,
     #     pages=[PageMapping(PagePath.WARNING_BULLETIN, scrape_current_bulletin)],
     #     process=None,
-    # ),
+    # ),   
+    SessionMapping(
+        name=SessionName.WARNING_MARINE,
+        pages=[PageMapping(PagePath.WARNING_MARINE, scrape_weather_warnings)],
+        process=aggregate_weather_warnings,
+    ),
+    SessionMapping(
+        name=SessionName.WARNING_HIGHT_SEAS,
+        pages=[PageMapping(PagePath.WARNING_HIGHT_SEAS, scrape_weather_warnings)],
+        process=aggregate_weather_warnings,
+    ),
     SessionMapping(
         name=SessionName.WARNING_SEVERE_WEATHER,
-        pages=[PageMapping(PagePath.WARNING_SEVERE_WEATHER, scrape_severe_weather_warning)],
-        process=aggregate_severe_weather_warning,
+        pages=[PageMapping(PagePath.WARNING_SEVERE_WEATHER, scrape_weather_warnings)],
+        process=aggregate_weather_warnings,
     ),
 ]
 

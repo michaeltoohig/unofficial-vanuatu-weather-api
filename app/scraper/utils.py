@@ -18,6 +18,10 @@ if TYPE_CHECKING:
     from app.scraper.pages import PageMapping
 
 
+def strip_html_text(text: str):
+    return text.strip().replace("\n", " ").replace("\t", "").replace("\xa0", "")
+
+
 def _save_html(html: str, fp: Path) -> None:
     vmgd_directory = Path(config.ROOT_DIR) / "data" / "vmgd"
     if fp.is_absolute():

@@ -9,8 +9,7 @@ from app.scraper.sessions import SessionName
 
 
 async def get_latest_session(
-    db_session: AsyncSession,
-    session_name: SessionName | None = None
+    db_session: AsyncSession, session_name: SessionName | None = None
 ) -> models.Session | None:
     """Returns lastest successfully completed scraping session."""
     query = (

@@ -26,7 +26,5 @@ def render_vmgd_api_response(
             issued=issued,
             fetched=fetched,
         ),
-        data=data
+        data=data,
     )
-
-

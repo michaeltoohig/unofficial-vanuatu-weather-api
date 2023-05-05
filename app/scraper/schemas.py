@@ -99,9 +99,3 @@ process_public_forecast_7_day_schema = {
     "minTemp": {"type": "integer", "coerce": int},
     "maxTemp": {"type": "integer", "coerce": int},
 }
-
-
-@dataclass
-class WarningObject:
-    date: datetime
-    body: str

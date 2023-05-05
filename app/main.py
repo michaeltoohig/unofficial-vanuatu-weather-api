@@ -26,6 +26,7 @@ from app.locations import LocationDep, get_all_locations
 from app.pages import get_latest_page
 from app.utils.api import VmgdApiResponse, render_vmgd_api_response
 from app.utils.datetime import DateDep
+from app.weather_warnings import get_latest_weather_warnings
 
 
 class CustomMiddleware:
@@ -244,23 +245,25 @@ async def forecast(
 
 
 @app.get("/v1/warnings")
-async def warnings_(
+async def weather_warnings_(
     request: Request,
     db_session: AsyncSession = Depends(get_db_session),
     *,
     dt: DateDep,
 ) -> VmgdApiResponse:
-    # TODO continue from here
-    ws = await get_latest_warnings(db_session, dt)
-    if not ws:
-        raise HTTPException(status_code=404, detail="No warnings data available")
+    # TODO accept warning name in query
+    # TODO handle datetime query for latest warning at given time
+    ww = await get_latest_weather_warnings(db_session, dt)
+    if not ww:
+        raise HTTPException(status_code=404, detail="No weather warning data available")
     data = [
-        schemas.WarningsResponse(
+        schemas.WeatherWarningResponse(
             date=w.date,
+            name=w.session._name,
             body=w.body,
         )
-        for w in ws
+        for w in ww
     ]
-    issued = ws[0].issued_at
-    fetched = ws[0].session.fetched-at
+    issued = ww[0].issued_at
+    fetched = ww[0].session.fetched_at
     return render_vmgd_api_response(data, issued=issued, fetched=fetched)

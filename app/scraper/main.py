@@ -55,7 +55,7 @@ async def process_page_mapping(db_session: AsyncSession, mapping: PageMapping):
 
     # process the HTML
     try:
-        issued_at, data = await mapping.process(html)
+        scraping_result = await mapping.process(html)
     except ScrapingNotFoundError as e:
         error = (PageErrorTypeEnum.DATA_NOT_FOUND, e)
     except ScrapingValidationError as e:
@@ -69,7 +69,7 @@ async def process_page_mapping(db_session: AsyncSession, mapping: PageMapping):
     if error:
         await handle_processing_page_mapping_error(db_session, mapping, error)
 
-    return issued_at, data
+    return scraping_result
 
 
 # async def handle_processing_session_mapping_error ???
@@ -77,7 +77,6 @@ async def process_page_mapping(db_session: AsyncSession, mapping: PageMapping):
 
 async def process_session_mapping(session_mapping: SessionMapping):
     # TODO do I want to check if session completed recently then ignore due to rate limits?
-    # - then I don't need to check page completed recently in `process_page_mapping`
 
     # create session
     async with async_session() as db_session:
@@ -94,20 +93,25 @@ async def process_session_mapping(session_mapping: SessionMapping):
             # TODO fetch each url async in task group
             for mapping in session_mapping.pages:
                 logger.info(f"page url {mapping.url}")
-                issued_at, raw_data = await process_page_mapping(db_session, mapping)
-                if issued_at == -1:  # warning page did not provide issued_at
-                    issued_at = session.fetched_at
+                scraping_result = await process_page_mapping(db_session, mapping)
+                if scraping_result.issued_at is None: # page did not provide issued_at; assume page is up-to-date
+                    scraping_result.issued_at = session.fetched_at
                 page = models.Page(
                     path=mapping.path,
-                    raw_data=raw_data,
+                    raw_data=scraping_result.raw_data,
                     session_id=session.id,
-                    issued_at=issued_at,
+                    issued_at=scraping_result.issued_at,
                 )
                 db_session.add(page)
                 pages.append(page)
 
+                if scraping_result.images is not None:
+                    # TODO
+                    pass
+
             await session_mapping.process(db_session, session, pages)
 
+            # complete the session
             session.completed_at = now()
             db_session.add(session)
             await db_session.flush()

@@ -44,12 +44,10 @@ async def get_location_by_name(
     db_session: AsyncSession,
     name: str,
 ) -> models.Location | None:
-    query = select(models.Location).where(func.lower(models.Location.name) == func.lower(name))
-    location = (
-        await db_session.execute(
-            query.limit(1)
-        )
-    ).scalar()
+    query = select(models.Location).where(
+        func.lower(models.Location.name) == func.lower(name)
+    )
+    location = (await db_session.execute(query.limit(1))).scalar()
     return location
 
 

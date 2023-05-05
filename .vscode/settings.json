@@ -1,4 +1,7 @@
 {
     "python.pythonPath": "/home/michael/.cache/pypoetry/virtualenvs/test-fastapi-TLHcGBKg-py3.8/bin/python",
-    "python.formatting.provider": "black"
+    "python.formatting.provider": "black",
+    "[python]": {
+        "editor.formatOnType": false
+    }
 }

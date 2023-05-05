@@ -4,7 +4,7 @@ from pathlib import Path
 from tkinter import N
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship, synonym
 from sqlalchemy.ext.hybrid import hybrid_property
 from app.config import ROOT_DIR
@@ -199,20 +199,30 @@ class ForecastDaily(Base):
     # windDir = Column(Float, nullable=False)
 
 
-class Warnings(Base):
-    __tablename__ = "warnings"
+class WeatherWarning(Base):
+    __tablename__ = "warning"
 
     id = Column(Integer, primary_key=True, index=True)
     session_id = Column(Integer, ForeignKey("session.id"), nullable=False)
-    session = relationship("Session", lazy="joined")  #, backref="warnings")
+    session = relationship("Session", lazy="joined")  # , backref="warnings")
 
     # category = Column(String, nullable=False)  # the slug of the page or just use the SessionName
-    
+
     issued_at = Column(DateTime(timezone=True), nullable=False)
     date = Column(DateTime(timezone=True), nullable=False)
-    body = Column(String, nullable=False)
+    no_current_warning = Column(Boolean, nullable=False)
+    body = Column(String)
 
     # @property
     # def category(self):
-    #     # TODO use a `property` on session to avoid `_name` 
+    #     # TODO use a `property` on session to avoid `_name`
     #     return self.session._name
+
+    def __init__(
+        self, session_id: int, issued_at: datetime, date: datetime, body: str = None
+    ):
+        self.session_id = session_id
+        self.issued_at = issued_at
+        self.date = date
+        self.no_current_warning = body is None  # no body, no current warning; simple as
+        self.body = body
