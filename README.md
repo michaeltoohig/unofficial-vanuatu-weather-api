@@ -1,5 +1,11 @@
 # legendary-winner-vmgd
 
+A web scraper and API for the Vanuatu Meteorology & Geo-Hazards Department (VMGD) website.
+The goal of this project is to provide VMGD data in a machine readable format.
+However, for no technical reason, I've limited the scope of the project to only the `forecast` and `warnings` section of the VMGD website.
+
+## Development
+
 Project commands are found in the `manage.py` file.
 
 To start the dev server:
@@ -18,25 +24,13 @@ To watch changes to scss files:
 
 High-level steps
 
-- [ ] create models
-- [ ] add commands which populate database
-- [ ] create API endpoints
+- [x] create models
+- [x] add commands which populate database
+- [x] create API endpoints
 - [ ] include sanity checks and alerts to admin
 
 - [ ] sort how to handle pages that contain images
+- [ ] `date` query should relate to `issued_at` values while another query value specifies the `fetched_at` value for a given resource.
 
-Plan going forward
-
-- [ ] abandon 2 step processing in favor of 1 shot processing
-
-Advantages:
- - PageError models strategy handles errors and stores failed html/data for review in future
- - Our scraped data schemas almost guarentee if we have valid data we expect then processing completely to a forecast or other final data format for the API should be consistent
- - Allows flexability for scraping data from different pages that all don't follow the same fetch -> process -> save JSON-like data format to allow saving images or one-off hash checks etc.
-
-Disadvantages:
- - Larger more complex processing functions which
- - Doesn't account for multiple pages that need to be joined together to create a single forecast
-
-Solution Plan:
- - Use  
+- [ ] basic but clean and presentable HTML home page to show forecast and hightlight project features plus point to source code.
+- [ ] fun api endpoints like "do I need an umbrella today" endpoint

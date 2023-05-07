@@ -33,7 +33,7 @@ class ScrapeResult:
 def process_issued_at(
     text: str, delimiter_start: str, delimiter_end: str = "(utc time"
 ) -> datetime:
-    """Given a text containing the `issued_at` value found between two delimiters extract the value and convert to a datetime.
+    """Given a text containing the `issued_at` value found between two delimiters extract the value and convert to a datetime in UTC.
     The general date format appears to be "%a %dXX %B, %Y at %H:%M" where `%dXX` is an ordinal number.
     Examples:
      - "Mon 27th March, 2023 at 15:02 (UTC Time:04:02)"

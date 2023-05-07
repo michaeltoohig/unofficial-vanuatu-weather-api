@@ -1,11 +1,13 @@
 """Actions related to the VMGD scraping sessions."""
-from sqlalchemy import select
+from typing import Annotated
 
+from fastapi import Query, Depends
+from sqlalchemy import select
 from loguru import logger
 
 from app import models
 from app.database import AsyncSession
-from app.scraper.sessions import SessionName
+from app.scraper.sessions import SessionName, WEATHER_WARNING_SESSIONS
 
 
 async def get_latest_session(
@@ -22,3 +24,13 @@ async def get_latest_session(
         query = query.where(models.Session._name == SessionName.value)
     session = (await db_session.execute(query)).scalar()
     return session
+
+
+async def get_warning_weather_session(session_name: str = Query(None, alias="name")):
+    if session_name is None:
+        return None
+    session = SessionName(session_name)
+    return session
+
+
+WeatherWarningSessionDep = Annotated[SessionName, Depends(get_warning_weather_session)]

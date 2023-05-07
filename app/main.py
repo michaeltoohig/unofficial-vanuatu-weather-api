@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+from typing import Annotated
 
 from asgiref.typing import ASGI3Application
 from asgiref.typing import ASGIReceiveCallable
@@ -24,6 +25,8 @@ from app.database import AsyncSession, async_session, get_db_session
 from app.forecasts import get_latest_forecasts
 from app.locations import LocationDep, get_all_locations
 from app.pages import get_latest_page
+from app.scraper.sessions import SessionName
+from app.scraper_sessions import WeatherWarningSessionDep
 from app.utils.api import VmgdApiResponse, render_vmgd_api_response
 from app.utils.datetime import DateDep
 from app.weather_warnings import get_latest_weather_warnings
@@ -183,6 +186,15 @@ async def index(
     )
 
 
+@app.get("/ping")
+async def get_healthcheck(
+    request: Request,
+) -> JSONResponse:
+    return JSONResponse(
+        content={"ping": "PONG!"}
+    )
+
+
 @app.get("/v1/locations")
 async def get_locations(
     requiest: Request,
@@ -200,6 +212,14 @@ async def get_locations(
     ]
 
 
+@app.get("/v1/pages")
+async def get_pages(
+    request: Request,
+):
+    # TODO return list of PageMapping objects we scrape
+    pass
+
+
 @app.get("/v1/raw/pages")
 async def raw_pages(
     request: Request,
@@ -211,8 +231,12 @@ async def raw_pages(
         url=page.url,
         data=page.raw_data,
     )
-    return render_vmgd_api_response(
-        data, issued=page.issued_at, fetched=page.session.fetched_at
+    return await render_vmgd_api_response(
+        db_session,
+        request,
+        data,
+        issued=page.issued_at,
+        fetched=page.session.fetched_at,
     )
 
 
@@ -241,7 +265,13 @@ async def forecast(
     ]
     issued = forecasts[0].issued_at
     fetched = forecasts[0].session.fetched_at
-    return render_vmgd_api_response(data, issued=issued, fetched=fetched)
+    return await render_vmgd_api_response(
+        db_session,
+        request,
+        data,
+        issued=issued,
+        fetched=fetched,
+    )
 
 
 @app.get("/v1/warnings")
@@ -250,10 +280,12 @@ async def weather_warnings_(
     db_session: AsyncSession = Depends(get_db_session),
     *,
     dt: DateDep,
+    warning_session: WeatherWarningSessionDep,
 ) -> VmgdApiResponse:
-    # TODO accept warning name in query
     # TODO handle datetime query for latest warning at given time
-    ww = await get_latest_weather_warnings(db_session, dt)
+    # TODO handle the issued_at value or latest issued_at that matches the actual warning on the date
+    logger.info("got", date=dt, session=warning_session)
+    ww = await get_latest_weather_warnings(db_session, dt=dt, session_name=warning_session)
     if not ww:
         raise HTTPException(status_code=404, detail="No weather warning data available")
     data = [
@@ -266,4 +298,11 @@ async def weather_warnings_(
     ]
     issued = ww[0].issued_at
     fetched = ww[0].session.fetched_at
-    return render_vmgd_api_response(data, issued=issued, fetched=fetched)
+    return await render_vmgd_api_response(
+        db_session,
+        request,
+        data,
+        issued=issued,
+        fetched=fetched,
+        skip_warnings=True,
+    )

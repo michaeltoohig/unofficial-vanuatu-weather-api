@@ -18,10 +18,13 @@ def as_vu_to_utc(dt: datetime) -> datetime:
     return dt.astimezone(timezone.utc)
 
 
-def get_datetime_dependency(d: date = Query(None, alias="date")):
+def get_datetime_dependency(d: date | datetime = Query(None, alias="date")):
     if d is None:
         return None
-    return as_utc(datetime.combine(d, time(0, 0)))
+    if isinstance(d, date):
+        d = datetime.combine(d, time(0, 0))
+    return as_utc(d)
+    # return as_utc(datetime.combine(d, time(0, 0)))  # for date objects
 
 
 DateDep = Annotated[datetime, Depends(get_datetime_dependency)]

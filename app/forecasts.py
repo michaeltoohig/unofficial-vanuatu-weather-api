@@ -31,7 +31,7 @@ async def _get_latest_forecast_session_subquery(
 async def get_latest_forecasts(
     db_session: AsyncSession,
     location: models.Location,
-    dt: datetime,
+    dt: datetime | None = None,
 ) -> models.Page | None:
     query = select(models.ForecastDaily)
     if location:

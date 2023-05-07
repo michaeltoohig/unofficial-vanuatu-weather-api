@@ -50,11 +50,10 @@ async def handle_location(l: Location, wo: WeatherObject, d2):
 
 
 def convert_to_datetime(date_string: str, issued_at: datetime) -> datetime:
-    """Convert human readable date string such as `Friday 24` or `Fri 24` to datetime.
+    """Convert human readable date string in local timezone such as `Friday 24` or `Fri 24` to datetime in UTC.
     We can do this assuming the following:
-     - the `issued_at` value is never before the `date_string`
      - the `date_string` is never representing a value greater than 1 month after the `issued_at` date
-    # TODO it is possible to find issued_at greater than date_string by a day or two - NOT HANDLED
+     - the `issued_at` value should generally be after the or equal to the `date_string`
     """
     day = int(date_string.split()[1])
     if day < issued_at.day:
@@ -63,7 +62,7 @@ def convert_to_datetime(date_string: str, issued_at: datetime) -> datetime:
         dt = datetime(next_month.year, next_month.month, day)
     else:
         dt = datetime(issued_at.year, issued_at.month, day)
-    return as_utc(dt)
+    return as_vu_to_utc(dt)
 
 
 def is_date_series_sequential(dates_list: list[datetime]):
@@ -78,7 +77,7 @@ def is_date_series_sequential(dates_list: list[datetime]):
 
 
 def verify_date_series(dates_list: list[datetime]) -> int:
-    """Checks dates are sequentially ordered ."""
+    """Verifies list of datetimes are ordered sequentially +and attempts to fix for common error due to ambigious date strings."""
     logger.info(dates_list)
     if is_date_series_sequential(dates_list):
         return dates_list
@@ -117,9 +116,8 @@ async def aggregate_forecast_week(
         datetimes = verify_date_series(datetimes)
         wo.dates = datetimes
     for d in data_2:
-        datetimes = convert_to_datetime(d["date"], issued_at)
-        datetimes = verify_date_series(datetimes)
-        d["date"] = datetimes
+        d["date"] = convert_to_datetime(d["date"], issued_at)
+        # TODO verify_date_series for each location in data_2
 
     for wo in weather_objects:
         if wo.location in location_cache:
