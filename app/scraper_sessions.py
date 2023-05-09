@@ -1,4 +1,5 @@
 """Actions related to the VMGD scraping sessions."""
+from http.client import HTTPException
 from typing import Annotated
 
 from fastapi import Query, Depends
@@ -30,6 +31,8 @@ async def get_warning_weather_session(session_name: str = Query(None, alias="nam
     if session_name is None:
         return None
     session = SessionName(session_name)
+    if not session in WEATHER_WARNING_SESSIONS:
+        raise HTTPException(status_code=400, detail="Not a valid weather warning session name")
     return session
 
 

@@ -25,10 +25,10 @@ from app.database import AsyncSession, async_session, get_db_session
 from app.forecasts import get_latest_forecasts
 from app.locations import LocationDep, get_all_locations
 from app.pages import get_latest_page
-from app.scraper.sessions import SessionName
+from app.scraper.sessions import WEATHER_WARNING_SESSIONS, SessionName
 from app.scraper_sessions import WeatherWarningSessionDep
 from app.utils.api import VmgdApiResponse, render_vmgd_api_response
-from app.utils.datetime import DateDep
+from app.utils.datetime import DateDep, now
 from app.weather_warnings import get_latest_weather_warnings
 
 
@@ -280,13 +280,22 @@ async def weather_warnings_(
     db_session: AsyncSession = Depends(get_db_session),
     *,
     dt: DateDep,
-    warning_session: WeatherWarningSessionDep,
+    session_name: WeatherWarningSessionDep,
 ) -> VmgdApiResponse:
-    # TODO handle datetime query for latest warning at given time
-    # TODO handle the issued_at value or latest issued_at that matches the actual warning on the date
-    logger.info("got", date=dt, session=warning_session)
-    ww = await get_latest_weather_warnings(db_session, dt=dt, session_name=warning_session)
-    if not ww:
+    if not dt:
+        dt = now()
+    
+    logger.info("got", date=dt, session=session_name)
+    weather_warnings = []
+    if not session_name:
+        for session_name in WEATHER_WARNING_SESSIONS:
+            ww = await get_latest_weather_warnings(db_session, dt=dt, session_name=session_name)
+            weather_warnings.extend(ww)
+    else:
+        ww = await get_latest_weather_warnings(db_session, dt=dt, session_name=session_name)
+        weather_warnings.extend(ww)
+
+    if not weather_warnings:
         raise HTTPException(status_code=404, detail="No weather warning data available")
     data = [
         schemas.WeatherWarningResponse(
@@ -294,10 +303,10 @@ async def weather_warnings_(
             name=w.session._name,
             body=w.body,
         )
-        for w in ww
+        for w in weather_warnings
     ]
-    issued = ww[0].issued_at
-    fetched = ww[0].session.fetched_at
+    issued = weather_warnings[0].issued_at
+    fetched = weather_warnings[0].session.fetched_at
     return await render_vmgd_api_response(
         db_session,
         request,

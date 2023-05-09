@@ -201,12 +201,13 @@ async def scrape_public_forecast_media(html: str) -> ScrapeResult:
     soup = BeautifulSoup(html, "html.parser")
     try:
         table = soup.find("table", class_="forecastPublic")
-        # TODO confirm this will silently fail as it will return None not raise
-    except:
-        raise ScrapingNotFoundError(html)
+        assert table is not None, "public forecast table is missing"
+    except Exception as exc:
+        raise ScrapingNotFoundError(html, errors=str(exc))
 
     try:
         images = table.find_all("img")
+        # TODO maybe allow no images
         assert len(images) > 0, "public forecast media images missing"
     except AssertionError as exc:
         raise ScrapingNotFoundError(html, errors=str(exc))
@@ -224,7 +225,7 @@ async def scrape_public_forecast_media(html: str) -> ScrapeResult:
         issued_str = strip_html_text(table.div.find_all("div")[1].text).split(
             " at ", 1
         )[1]
-        issued_at = datetime.strptime(issued_str, "%H:%M %p,\xa0%A %B %d %Y")
+        issued_at = datetime.strptime(issued_str, "%H:%M %p,%A %B %d %Y")
         issued_at = as_vu_to_utc(issued_at)
     except (IndexError, ValueError) as exc:
         raise ScrapingIssuedAtError(html, errors=str(exc))

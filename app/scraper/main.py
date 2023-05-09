@@ -74,6 +74,20 @@ async def process_page_mapping(db_session: AsyncSession, mapping: PageMapping):
 
 # async def handle_processing_session_mapping_error ???
 
+async def process_page_image(page, image):
+    src = image['src']
+    assert src is not None, "image must have a src attribute"
+    print(page, src[:50])
+    if src.startswith("data"):
+        pass  # TODO save b64 encoded image
+    elif src.startswith("http") or src.startswith("/"):
+        pass # TODO download
+    else:
+        raise Exception
+    # TODO
+    # add local image files to PageImage table and attach to Page via relationship
+
+
 
 async def process_session_mapping(session_mapping: SessionMapping):
     # TODO do I want to check if session completed recently then ignore due to rate limits?
@@ -106,8 +120,9 @@ async def process_session_mapping(session_mapping: SessionMapping):
                 pages.append(page)
 
                 if scraping_result.images is not None:
-                    # TODO
-                    pass
+                    for image in scraping_result.images:
+                        await process_page_image(page, image)
+                sys.exit()
 
             await session_mapping.process(db_session, session, pages)
 

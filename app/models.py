@@ -29,6 +29,8 @@ class Session(Base):
     # _errors = Column("errors", String)
     # count = Column(Integer)
 
+    weather_warnings = relationship("WeatherWarning", back_populates="session")
+
     def __init__(self, name: str):
         self._name = name
 
@@ -87,8 +89,7 @@ class Page(Base):
 #     __tablename__ = "page_image"
 
 #     id = Column(Integer, primary_key=True, index=True)
-#     fetched_at = Column(DateTime(timezone=True), nullable=False)
-#     issued_at = Column(DateTime(timezone=True), nullable=False)
+# #     issued_at = Column(DateTime(timezone=True), nullable=False)
 
 #     url = Column(String, nullable=False)
 #     name = Column(String, nullable=False)
@@ -204,7 +205,7 @@ class WeatherWarning(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     session_id = Column(Integer, ForeignKey("session.id"), nullable=False)
-    session = relationship("Session", lazy="joined")  # , backref="warnings")
+    session = relationship("Session", lazy="joined", back_populates="weather_warnings")
 
     # category = Column(String, nullable=False)  # the slug of the page or just use the SessionName
 

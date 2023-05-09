@@ -15,6 +15,7 @@ async def _get_latest_forecast_session_subquery(
     location: models.Location,
     dt: datetime,
 ):
+    # TODO use `start` and `end` date for weather date filters like warnings
     subquery = (
         select(models.Session.id)
         .join(models.Session.forecasts)
