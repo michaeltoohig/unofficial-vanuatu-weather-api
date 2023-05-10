@@ -1,3 +1,5 @@
+import base64
+import uuid
 import anyio
 import httpx
 from loguru import logger
@@ -76,14 +78,17 @@ async def process_page_mapping(db_session: AsyncSession, mapping: PageMapping):
 
 async def process_page_image(page, image):
     src = image['src']
+    filename = uuid.uuid4()
     assert src is not None, "image must have a src attribute"
     print(page, src[:50])
     if src.startswith("data"):
-        pass  # TODO save b64 encoded image
+        with open("test.png", "wb") as f:
+            f.write(base64.b64decode(src.split("base64,", 1)[1]))
+        
     elif src.startswith("http") or src.startswith("/"):
         pass # TODO download
     else:
-        raise Exception
+        raise ScrapingNotFoundError
     # TODO
     # add local image files to PageImage table and attach to Page via relationship
 

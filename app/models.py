@@ -29,6 +29,9 @@ class Session(Base):
     # _errors = Column("errors", String)
     # count = Column(Integer)
 
+    forecasts = relationship("ForecastDaily", back_populates="session")
+    media = relationship("ForecastMedia", back_populates="session")
+    images = relationship("Image", back_populates="session")
     weather_warnings = relationship("WeatherWarning", back_populates="session")
 
     def __init__(self, name: str):
@@ -81,19 +84,6 @@ class Page(Base):
     @raw_data.setter
     def raw_data(self, data):
         self._raw_data = json.dumps(data)
-
-
-# TODO save images collected from some pages
-#
-# class PageImage(Base):
-#     __tablename__ = "page_image"
-
-#     id = Column(Integer, primary_key=True, index=True)
-# #     issued_at = Column(DateTime(timezone=True), nullable=False)
-
-#     url = Column(String, nullable=False)
-#     name = Column(String, nullable=False)
-#     file_hash = Column(String, nullable=False)
 
 
 class PageError(Base):
@@ -183,7 +173,7 @@ class ForecastDaily(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     session_id = Column(Integer, ForeignKey("session.id"), nullable=False)
-    session = relationship("Session", lazy="joined", backref="forecasts")
+    session = relationship("Session", lazy="joined", back_populates="forecasts")
 
     location_id = Column(Integer, ForeignKey("location.id"), nullable=False)
     location = relationship("Location", lazy="joined")
@@ -198,6 +188,38 @@ class ForecastDaily(Base):
     # below values are available in 6 hour increments so we would have to calculate a daily average for each
     # windSpeed = Column(Integer, nullable=False)
     # windDir = Column(Float, nullable=False)
+
+
+class ForecastMedia(Base):
+    __tablename__ = "forecast_media"
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("session.id"), nullable=False)
+    session = relationship("Session", lazy="joined", back_populates="media")
+
+    issued_at = Column(DateTime(timezone=True), nullable=False)
+    date = Column(DateTime(timezone=True), nullable=False)
+    summary = Column(String, nullable=False)
+    
+
+class Image(Base):
+    __tablename__ = "image"
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("session.id"), nullable=False)
+    session = relationship("Session", lazy="joined", back_populates="images")
+
+    issued_at = Column(DateTime(timezone=True), nullable=False)
+    server_filename = Column("filname", String, nullable=False, unique=True)
+
+    def __init__(self, session_id: int, issued_at: datetime, filename: Path) -> None:
+        self.session_id = session_id
+        self.issued_at = issued_at
+        self.server_filename = str(filename)
+
+    @property
+    def filepath(self):
+        return None
 
 
 class WeatherWarning(Base):
