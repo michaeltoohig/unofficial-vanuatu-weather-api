@@ -11,6 +11,7 @@ from app.scraper.scrapers import (
     scrape_weather_warnings,
 )
 from app.scraper.aggregators import (
+    aggregate_forecast_media,
     aggregate_forecast_week,
     aggregate_weather_warnings,
 )
@@ -52,7 +53,7 @@ session_mappings = [
     SessionMapping(
         name=SessionName.FORECAST_MEDIA,
         pages=[PageMapping(PagePath.FORECAST_MEDIA, scrape_public_forecast_media)],
-        process=None,
+        process=aggregate_forecast_media,
     ),
     # SessionMapping(
     #     name=SessionName.WARNING_BULLETIN,

@@ -37,6 +37,7 @@ class Config(BaseModel):
     vmgd_base_url: str = "https://www.vmgd.gov.vu/vmgd/index.php"
     vmgd_attribution: str = "The data provided was collected on the `fetched` date provided from the Vanuatu Meteorology & Geo-Hazards Department website at https://vmgd.gov.vu/. This service should not be used by anyone for anything; always get up-to-date and accurate data from the VMGD website directly."
 
+    vmgd_image_path: str | None = None
 
 # def load_config() -> Config:
 #     try:
@@ -61,3 +62,5 @@ SQLALCHEMY_DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 VMGD_BASE_URL = CONFIG.vmgd_base_url
 VMGD_ATTRIBUTION = CONFIG.vmgd_attribution
+
+VMGD_IMAGE_PATH = CONFIG.vmgd_image_path or ROOT_DIR / "data" / "vmgd" / "images"

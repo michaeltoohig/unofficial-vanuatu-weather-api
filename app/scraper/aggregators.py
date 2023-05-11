@@ -8,7 +8,7 @@ from loguru import logger
 
 from app.database import AsyncSession
 from app.locations import save_forecast_location
-from app.models import ForecastDaily, Location, Page, Session, WeatherWarning
+from app.models import ForecastDaily, ForecastMedia, Location, Page, Session, WeatherWarning
 from app.scraper.schemas import WeatherObject
 from app.scraper.scrapers import NO_CURRENT_WARNING
 from app.utils.datetime import as_utc, as_vu_to_utc, now
@@ -139,6 +139,20 @@ async def aggregate_forecast_week(
             forecast.issued_at = issued_at
             forecast.session_id = session.id
             db_session.add(forecast)
+
+
+async def aggregate_forecast_media(db_session: AsyncSession, session: Session, pages: list[Page]):
+    """Handles data from forecast media.
+    In the future we may OCR the images but for now its simple."""
+    assert len(pages) == 1, "Unexpected items in pages list"
+    page = pages[0]
+
+    forecast_media = ForecastMedia(
+        session_id=session.id,
+        issued_at=page.issued_at,
+        summary=page.raw_data,
+    ) 
+    db_session.add(forecast_media)
 
 
 def convert_warning_at_to_datetime(text: str, delimiter_start: str = ": ") -> datetime:

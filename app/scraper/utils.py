@@ -34,10 +34,10 @@ def _save_html(html: str, fp: Path) -> None:
     fp.write_text(html)
 
 
-def _save_image(base64_string: str, fp: Path) -> None:
-    base64_data = base64_string.replace("data:image/png;base64,", "")
-    png_data = base64.b64decode(base64_data)
-    fp.write_bytes(png_data)
+# def _save_image(base64_string: str, fp: Path) -> None:
+#     base64_data = base64_string.replace("data:image/png;base64,", "")
+#     png_data = base64.b64decode(base64_data)
+#     fp.write_bytes(png_data)
 
 
 async def fetch(url: str) -> str:

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship, synonym
 from sqlalchemy.ext.hybrid import hybrid_property
-from app.config import ROOT_DIR
+from app.config import ROOT_DIR, VMGD_IMAGE_PATH
 
 from app.database import Base
 
@@ -198,7 +198,6 @@ class ForecastMedia(Base):
     session = relationship("Session", lazy="joined", back_populates="media")
 
     issued_at = Column(DateTime(timezone=True), nullable=False)
-    date = Column(DateTime(timezone=True), nullable=False)
     summary = Column(String, nullable=False)
     
 
@@ -210,16 +209,17 @@ class Image(Base):
     session = relationship("Session", lazy="joined", back_populates="images")
 
     issued_at = Column(DateTime(timezone=True), nullable=False)
-    server_filename = Column("filname", String, nullable=False, unique=True)
+    _server_filepath = Column("filepath", String, nullable=False, unique=True)
 
-    def __init__(self, session_id: int, issued_at: datetime, filename: Path) -> None:
+    def __init__(self, session_id: int, issued_at: datetime, filepath: Path) -> None:
         self.session_id = session_id
         self.issued_at = issued_at
-        self.server_filename = str(filename)
+        assert filepath.relative_to(VMGD_IMAGE_PATH), "Image filepath is not subdirectory of root VMGD images directory"
+        self._server_filepath = str(filepath.relative_to(VMGD_IMAGE_PATH))
 
     @property
     def filepath(self):
-        return None
+        return Path(VMGD_IMAGE_PATH) / self._server_filepath
 
 
 class WeatherWarning(Base):

@@ -1,10 +1,12 @@
 import base64
+from pathlib import Path
 import uuid
 import anyio
 import httpx
 from loguru import logger
 
 from app import models
+from app.config import VMGD_IMAGE_PATH
 from app.database import AsyncSession, async_session
 from app.scraper.exceptions import (
     PageNotFoundError,
@@ -76,22 +78,24 @@ async def process_page_mapping(db_session: AsyncSession, mapping: PageMapping):
 
 # async def handle_processing_session_mapping_error ???
 
-async def process_page_image(page, image):
-    src = image['src']
-    filename = uuid.uuid4()
-    assert src is not None, "image must have a src attribute"
-    print(page, src[:50])
+async def process_page_image(page, elem) -> Path:
+    """Save contents of image element to local storage."""
+    src = elem['src']
+    assert src is not None, "image element must have a src attribute"
+
+    file_id = uuid.uuid4()
+    # NOTE we assume png images
+    filepath = Path(VMGD_IMAGE_PATH) / str(file_id)[:2] / f"{file_id}.png"
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+
     if src.startswith("data"):
-        with open("test.png", "wb") as f:
-            f.write(base64.b64decode(src.split("base64,", 1)[1]))
-        
+        filepath.write_bytes(base64.b64decode(src.split("base64,", 1)[1]))
     elif src.startswith("http") or src.startswith("/"):
-        pass # TODO download
+        raise NotImplementedError("remote image fetching not implemented")
     else:
         raise ScrapingNotFoundError
-    # TODO
-    # add local image files to PageImage table and attach to Page via relationship
 
+    return filepath
 
 
 async def process_session_mapping(session_mapping: SessionMapping):
@@ -125,9 +129,17 @@ async def process_session_mapping(session_mapping: SessionMapping):
                 pages.append(page)
 
                 if scraping_result.images is not None:
-                    for image in scraping_result.images:
-                        await process_page_image(page, image)
-                sys.exit()
+                    # TODO store list of all images, pass images to `process` in case we add image OCR or other
+                    # also could delete images on failure of the session
+                    for image_elem in scraping_result.images:
+                        image_fp = await process_page_image(page, image_elem)
+                        # XXX maybe this could be in the `process` function
+                        image = models.Image(
+                            session_id=session.id,
+                            issued_at=scraping_result.issued_at,
+                            filepath=image_fp,
+                        )
+                        db_session.add(image)
 
             await session_mapping.process(db_session, session, pages)
 
