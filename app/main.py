@@ -291,7 +291,7 @@ async def forecast_media_(
     images = await get_images_by_session_id(db_session, forecast_media.session_id)
     data = schemas.ForecastMediaResponse(
         summary=forecast_media.summary,
-        images=[img._server_filepath for img in images],
+        images=[img._server_filepath for img in images] if images is not None else [],
     )
     issued = forecast_media.issued_at
     fetched = forecast_media.session.fetched_at
