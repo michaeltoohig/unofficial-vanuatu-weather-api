@@ -19,6 +19,8 @@ def as_vu_to_utc(dt: datetime) -> datetime:
 
 
 def get_datetime_dependency(d: date | datetime = Query(None, alias="date")):
+    """Returns datetime from query parameter assumed to be UTC.
+    TODO Future revisions should support arbitrary timezones and convert to UTC."""
     if d is None:
         return None
     if isinstance(d, date):

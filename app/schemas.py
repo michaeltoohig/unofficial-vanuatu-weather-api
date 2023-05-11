@@ -31,6 +31,12 @@ class ForecastResponse:
 
 
 @dataclass
+class ForecastMediaResponse:
+    summary: str
+    images: list[str] | None = None
+
+
+@dataclass
 class WeatherWarningResponse:
     date: datetime
     name: str

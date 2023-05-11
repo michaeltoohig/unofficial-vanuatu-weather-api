@@ -22,6 +22,7 @@ from sqlalchemy import select
 from app import models, schemas, templates
 from app.config import DEBUG
 from app.database import AsyncSession, async_session, get_db_session
+from app.forecast_media import get_images_by_session_id, get_latest_forecast_media
 from app.forecasts import get_latest_forecasts
 from app.locations import LocationDep, get_all_locations
 from app.pages import get_latest_page
@@ -265,6 +266,35 @@ async def forecast(
     ]
     issued = forecasts[0].issued_at
     fetched = forecasts[0].session.fetched_at
+    return await render_vmgd_api_response(
+        db_session,
+        request,
+        data,
+        issued=issued,
+        fetched=fetched,
+    )
+
+
+@app.get("/v1/media")
+async def forecast_media_(
+    request: Request,
+    db_session: AsyncSession = Depends(get_db_session),
+    *,
+    dt: DateDep,
+) -> VmgdApiResponse:
+    if not dt:
+        dt = now()
+    forecast_media = await get_latest_forecast_media(db_session, dt)
+    if not forecast_media:
+        raise HTTPException(status_code=404, detail="No forecast data available")
+    
+    images = await get_images_by_session_id(db_session, forecast_media.session_id)
+    data = schemas.ForecastMediaResponse(
+        summary=forecast_media.summary,
+        images=[img._server_filepath for img in images],
+    )
+    issued = forecast_media.issued_at
+    fetched = forecast_media.session.fetched_at
     return await render_vmgd_api_response(
         db_session,
         request,
