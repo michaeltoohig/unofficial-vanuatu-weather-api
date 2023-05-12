@@ -1,5 +1,5 @@
 """Actions related to the forecasts."""
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy import select
 
 from loguru import logger
@@ -15,12 +15,14 @@ async def _get_latest_forecast_session_subquery(
     location: models.Location,
     dt: datetime,
 ):
-    # TODO use `start` and `end` date for weather date filters like warnings
+    """Get latest forecast media session for the date given."""
+    end = dt
+    start = end - timedelta(days=1)
     subquery = (
         select(models.Session.id)
         .join(models.Session.forecasts)
         .filter(models.Session.completed_at is not None)
-        .filter(models.ForecastDaily.date == dt)
+        .filter(models.ForecastDaily.date >= start, models.ForecastDaily.date < end)
     )
     if location:
         subquery = subquery.filter(models.ForecastDaily.location_id == location.id)
@@ -39,10 +41,17 @@ async def get_latest_forecasts(
         query = query.where(models.ForecastDaily.location_id == location.id)
     if dt:
         subq = await _get_latest_forecast_session_subquery(db_session, location, dt)
-        query = query.where(models.ForecastDaily.session_id == subq).where(
-            models.ForecastDaily.date == dt
+        threshold = dt - timedelta(days=1)
+        query = (
+            query
+            .where(models.ForecastDaily.session_id == subq)
+            .where(models.ForecastDaily.date > threshold)
+            .where(models.ForecastDaily.date <= dt)
+            .order_by(models.ForecastDaily.date.desc())
+            .limit(1)
         )
     else:
+        # TODO failure here due to unspecified session name
         session = await get_latest_session(db_session)
         query = query.where(models.ForecastDaily.session_id == session.id)
     forecasts = (await db_session.execute(query)).scalars().all()

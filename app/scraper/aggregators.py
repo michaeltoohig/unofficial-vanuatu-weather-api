@@ -1,5 +1,5 @@
 """Functions that handle the messy work of aggregating and cleaning the results of scrapers."""
-
+import re
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
@@ -146,11 +146,11 @@ async def aggregate_forecast_media(db_session: AsyncSession, session: Session, p
     In the future we may OCR the images but for now its simple."""
     assert len(pages) == 1, "Unexpected items in pages list"
     page = pages[0]
-
+    summary = re.sub(' +', ' ', page.raw_data)
     forecast_media = ForecastMedia(
         session_id=session.id,
         issued_at=page.issued_at,
-        summary=page.raw_data,
+        summary=summary,
     ) 
     db_session.add(forecast_media)
 

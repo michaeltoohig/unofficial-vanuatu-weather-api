@@ -34,6 +34,8 @@ class Config(BaseModel):
     debug: bool = True
     sqlalchemy_database: str | None = None
 
+    use_page_cache: bool = False
+
     vmgd_base_url: str = "https://www.vmgd.gov.vu/vmgd/index.php"
     vmgd_attribution: str = "The data provided was collected on the `fetched` date provided from the Vanuatu Meteorology & Geo-Hazards Department website at https://vmgd.gov.vu/. This service should not be used by anyone for anything; always get up-to-date and accurate data from the VMGD website directly."
 
@@ -59,6 +61,8 @@ BASE_URL = f"{_SCHEME}://{DOMAIN}"
 DEBUG = CONFIG.debug
 DB_PATH = CONFIG.sqlalchemy_database or ROOT_DIR / "data" / "db.sqlite"
 SQLALCHEMY_DATABASE_URL = f"sqlite:///{DB_PATH}"
+
+USE_PAGE_CACHE = CONFIG.use_page_cache
 
 VMGD_BASE_URL = CONFIG.vmgd_base_url
 VMGD_ATTRIBUTION = CONFIG.vmgd_attribution

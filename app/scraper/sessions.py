@@ -42,39 +42,39 @@ WEATHER_WARNING_SESSIONS = [
 
 
 session_mappings = [
-    # SessionMapping(
-    #     name=SessionName.FORECAST_GENERAL,
-    #     pages=[
-    #         PageMapping(PagePath.FORECAST_MAP, scrape_forecast),
-    #         PageMapping(PagePath.FORECAST_WEEK, scrape_public_forecast_7_day),
-    #     ],
-    #     process=aggregate_forecast_week,
-    # ),
+    SessionMapping(
+        name=SessionName.FORECAST_GENERAL,
+        pages=[
+            PageMapping(PagePath.FORECAST_MAP, scrape_forecast),
+            PageMapping(PagePath.FORECAST_WEEK, scrape_public_forecast_7_day),
+        ],
+        process=aggregate_forecast_week,
+    ),
     SessionMapping(
         name=SessionName.FORECAST_MEDIA,
         pages=[PageMapping(PagePath.FORECAST_MEDIA, scrape_public_forecast_media)],
         process=aggregate_forecast_media,
     ),
-    # SessionMapping(
-    #     name=SessionName.WARNING_BULLETIN,
-    #     pages=[PageMapping(PagePath.WARNING_BULLETIN, scrape_current_bulletin)],
-    #     process=None,
-    # ),   
-    # SessionMapping(
-    #     name=SessionName.WARNING_MARINE,
-    #     pages=[PageMapping(PagePath.WARNING_MARINE, scrape_weather_warnings)],
-    #     process=aggregate_weather_warnings,
-    # ),
-    # SessionMapping(
-    #     name=SessionName.WARNING_HIGHT_SEAS,
-    #     pages=[PageMapping(PagePath.WARNING_HIGHT_SEAS, scrape_weather_warnings)],
-    #     process=aggregate_weather_warnings,
-    # ),
-    # SessionMapping(
-    #     name=SessionName.WARNING_SEVERE_WEATHER,
-    #     pages=[PageMapping(PagePath.WARNING_SEVERE_WEATHER, scrape_weather_warnings)],
-    #     process=aggregate_weather_warnings,
-    # ),
+    SessionMapping(
+        name=SessionName.WARNING_BULLETIN,
+        pages=[PageMapping(PagePath.WARNING_BULLETIN, scrape_current_bulletin)],
+        process=aggregate_weather_warnings,
+    ),   
+    SessionMapping(
+        name=SessionName.WARNING_MARINE,
+        pages=[PageMapping(PagePath.WARNING_MARINE, scrape_weather_warnings)],
+        process=aggregate_weather_warnings,
+    ),
+    SessionMapping(
+        name=SessionName.WARNING_HIGHT_SEAS,
+        pages=[PageMapping(PagePath.WARNING_HIGHT_SEAS, scrape_weather_warnings)],
+        process=aggregate_weather_warnings,
+    ),
+    SessionMapping(
+        name=SessionName.WARNING_SEVERE_WEATHER,
+        pages=[PageMapping(PagePath.WARNING_SEVERE_WEATHER, scrape_weather_warnings)],
+        process=aggregate_weather_warnings,
+    ),
 ]
 
 

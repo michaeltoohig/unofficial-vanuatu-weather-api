@@ -4,7 +4,7 @@ from pathlib import Path
 from tkinter import N
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Column, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship, synonym
 from sqlalchemy.ext.hybrid import hybrid_property
 from app.config import ROOT_DIR, VMGD_IMAGE_PATH
@@ -12,7 +12,7 @@ from app.config import ROOT_DIR, VMGD_IMAGE_PATH
 from app.database import Base
 
 # from app.scraper.sessions import SessionName
-from app.utils.datetime import now
+from app.utils.datetime import now, UTCDateTime
 
 if TYPE_CHECKING:
     from app.scraper.pages import PagePath
@@ -23,8 +23,8 @@ class Session(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     _name = Column("name", String, nullable=False)
-    started_at = Column(DateTime(timezone=True), nullable=False, default=now)
-    completed_at = Column(DateTime(timezone=True))
+    started_at = Column(UTCDateTime(), nullable=False, default=now)
+    completed_at = Column(UTCDateTime())
     # error handling or record keeping in the session instead of a different table?
     # _errors = Column("errors", String)
     # count = Column(Integer)
@@ -60,7 +60,7 @@ class Page(Base):
     session = relationship("Session", lazy="joined")
 
     _path = Column("url", String, nullable=False)
-    issued_at = Column(DateTime(timezone=True), nullable=False)
+    issued_at = Column(UTCDateTime(), nullable=False)
     _raw_data = Column("json_data", String, nullable=False)
 
     url = synonym("path")
@@ -90,8 +90,8 @@ class PageError(Base):
     __tablename__ = "page_error"
 
     id = Column(Integer, primary_key=True, index=True)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=now)
-    updated_at = Column(DateTime(timezone=True))
+    created_at = Column(UTCDateTime(), nullable=False, default=now)
+    updated_at = Column(UTCDateTime())
 
     url = Column(String, nullable=False)
     _description = Column("description", String, nullable=False)
@@ -152,8 +152,8 @@ class Location(Base):
     __tablename__ = "location"
 
     id = Column(Integer, primary_key=True, index=True)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=now)
-    updated_at = Column(DateTime(timezone=True), nullable=False, default=now)
+    created_at = Column(UTCDateTime(), nullable=False, default=now)
+    updated_at = Column(UTCDateTime(), nullable=False, default=now)
 
     name = Column(String, nullable=False, unique=True)
     latitude = Column(Float, nullable=False)
@@ -178,8 +178,8 @@ class ForecastDaily(Base):
     location_id = Column(Integer, ForeignKey("location.id"), nullable=False)
     location = relationship("Location", lazy="joined")
 
-    issued_at = Column(DateTime(timezone=True), nullable=False)
-    date = Column(DateTime(timezone=True), nullable=False)
+    issued_at = Column(UTCDateTime(), nullable=False)
+    date = Column(UTCDateTime(), nullable=False)
     summary = Column(String, nullable=False)
     minTemp = Column(Integer, nullable=False)
     maxTemp = Column(Integer, nullable=False)
@@ -197,7 +197,7 @@ class ForecastMedia(Base):
     session_id = Column(Integer, ForeignKey("session.id"), nullable=False)
     session = relationship("Session", lazy="joined", back_populates="media")
 
-    issued_at = Column(DateTime(timezone=True), nullable=False)
+    issued_at = Column(UTCDateTime(), nullable=False)
     summary = Column(String, nullable=False)
     
 
@@ -208,7 +208,7 @@ class Image(Base):
     session_id = Column(Integer, ForeignKey("session.id"), nullable=False)
     session = relationship("Session", lazy="joined", back_populates="images")
 
-    issued_at = Column(DateTime(timezone=True), nullable=False)
+    issued_at = Column(UTCDateTime(), nullable=False)
     _server_filepath = Column("filepath", String, nullable=False, unique=True)
 
     def __init__(self, session_id: int, issued_at: datetime, filepath: Path) -> None:
@@ -231,8 +231,8 @@ class WeatherWarning(Base):
 
     # category = Column(String, nullable=False)  # the slug of the page or just use the SessionName
 
-    issued_at = Column(DateTime(timezone=True), nullable=False)
-    date = Column(DateTime(timezone=True), nullable=False)
+    issued_at = Column(UTCDateTime(), nullable=False)
+    date = Column(UTCDateTime(), nullable=False)
     no_current_warning = Column(Boolean, nullable=False)
     body = Column(String)
 

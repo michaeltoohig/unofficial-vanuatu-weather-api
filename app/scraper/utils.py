@@ -77,13 +77,13 @@ def check_cache(page: "PageMapping") -> str | None:
 
 async def fetch_page(page: "PageMapping"):
     cache_file = None
-    if config.DEBUG:
+    if config.DEBUG and config.USE_PAGE_CACHE:
         html, cache_file = check_cache(page)
         if html:
             return html
 
     html = await fetch(page.url)
 
-    if config.DEBUG:
+    if config.DEBUG and config.USE_PAGE_CACHE:
         cache_file.write_text(html)
     return html

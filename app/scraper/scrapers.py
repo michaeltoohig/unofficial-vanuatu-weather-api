@@ -245,17 +245,27 @@ async def scrape_current_bulletin(html: str) -> ScrapeResult:
     I do not have an example of warnings yet so I can not implement it yet."""
     soup = BeautifulSoup(html, "html.parser")
     try:
-        warning_div = soup.find("div", class_="foreWarning")
-    except:
-        raise ScrapingNotFoundError(html)
+        warnings_table = soup.find("div", class_="foreWarning")
+        if "no latest warning" in strip_html_text(warnings_table.h4.text):
+            logger.info("No current warning reported")
+            return NoCurrentWarningsResult
+        else:
+            raise NotImplementedError
+        
+        # if warnings_table:
+        #     logger.debug("No warnings table found")
+        #     assert "no latest warning" in strip_html_text(warnings_table.text), "Exepcted `no latest warning` in text"
+        #     logger.info("No current warning reported")
+        #     return NoCurrentWarningsResult
+        # else:
+        #     logger.debug("warnings table found")
+        #     current_warnings = []
+        #     raise NotImplementedError
+        #     # TODO when I have an example to reference
+    except Exception as exc:
+        raise ScrapingNotFoundError(html, errors=str(exc))
 
-    if strip_html_text(warning_div.text) == "there is no latest warning":
-        return NoCurrentWarningsResult
-    else:
-        raise NotImplementedError
-        # has warnings
-        # need example to implement
-        pass
+    # TODO get issued_at
 
 
 async def scrape_weather_warnings(html: str) -> ScrapeResult:
@@ -275,7 +285,7 @@ async def scrape_weather_warnings(html: str) -> ScrapeResult:
             logger.info("No current warning reported")
             return NoCurrentWarningsResult
         else:
-            logger.info("warnings table found")
+            logger.debug("warnings table found")
             current_warnings = []
             cw_tablerows = warnings_table.find_all("tr")
             assert (

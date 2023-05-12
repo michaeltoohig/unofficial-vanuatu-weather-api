@@ -18,9 +18,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.types import Message
 from sqlalchemy import select
 
-
 from app import models, schemas, templates
-from app.config import DEBUG
+from app.config import DEBUG, ROOT_DIR, VMGD_IMAGE_PATH
 from app.database import AsyncSession, async_session, get_db_session
 from app.forecast_media import get_images_by_session_id, get_latest_forecast_media
 from app.forecasts import get_latest_forecasts
@@ -121,6 +120,11 @@ class CustomMiddleware:
 app = FastAPI()  # docs_url=None, redoc_url=None)
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
+app.mount(
+    "/images",
+    StaticFiles(directory=str(VMGD_IMAGE_PATH.relative_to(ROOT_DIR))),
+    name="images",
+)
 
 app.add_middleware(CustomMiddleware)
 
@@ -191,9 +195,7 @@ async def index(
 async def get_healthcheck(
     request: Request,
 ) -> JSONResponse:
-    return JSONResponse(
-        content={"ping": "PONG!"}
-    )
+    return JSONResponse(content={"message": "PONG!"})
 
 
 @app.get("/v1/locations")
@@ -219,6 +221,17 @@ async def get_pages(
 ):
     # TODO return list of PageMapping objects we scrape
     pass
+
+
+@app.get("/v1/raw/sessions/latest")
+async def get_latest_sessions(
+    request: Request,
+    db_session: AsyncSession = Depends(get_db_session),
+    *,
+    name: str,
+) -> JSONResponse:
+    for name in SessionName:
+        session = await get_latest_scraper_sessions
 
 
 @app.get("/v1/raw/pages")
@@ -282,12 +295,12 @@ async def forecast_media_(
     *,
     dt: DateDep,
 ) -> VmgdApiResponse:
-    if not dt:
+    if dt is None:
         dt = now()
     forecast_media = await get_latest_forecast_media(db_session, dt)
     if not forecast_media:
         raise HTTPException(status_code=404, detail="No forecast data available")
-    
+
     images = await get_images_by_session_id(db_session, forecast_media.session_id)
     data = schemas.ForecastMediaResponse(
         summary=forecast_media.summary,
@@ -314,15 +327,17 @@ async def weather_warnings_(
 ) -> VmgdApiResponse:
     if not dt:
         dt = now()
-    
-    logger.info("got", date=dt, session=session_name)
     weather_warnings = []
     if not session_name:
         for session_name in WEATHER_WARNING_SESSIONS:
-            ww = await get_latest_weather_warnings(db_session, dt=dt, session_name=session_name)
+            ww = await get_latest_weather_warnings(
+                db_session, dt=dt, session_name=session_name
+            )
             weather_warnings.extend(ww)
     else:
-        ww = await get_latest_weather_warnings(db_session, dt=dt, session_name=session_name)
+        ww = await get_latest_weather_warnings(
+            db_session, dt=dt, session_name=session_name
+        )
         weather_warnings.extend(ww)
 
     if not weather_warnings:
@@ -335,8 +350,8 @@ async def weather_warnings_(
         )
         for w in weather_warnings
     ]
-    issued = weather_warnings[0].issued_at
-    fetched = weather_warnings[0].session.fetched_at
+    issued = min(map(lambda w: w.issued_at, weather_warnings))
+    fetched = min(map(lambda w: w.session.fetched_at, weather_warnings))
     return await render_vmgd_api_response(
         db_session,
         request,

@@ -14,9 +14,9 @@ async def _get_latest_forecast_media_session_subquery(
     db_session: AsyncSession,
     dt: datetime,
 ):
-    # TODO use `start` and `end` date for weather date filters like warnings
-    start = dt.replace(hour=0, minute=0, second=0, microsecond=0)
-    end = start + timedelta(days=1)
+    """Get latest forecast media session for the date given."""
+    end = dt
+    start = end - timedelta(days=1)
     subquery = (
         select(models.Session.id)
         .join(models.Session.media)
@@ -36,12 +36,9 @@ async def get_latest_forecast_media(
     query = select(models.ForecastMedia)
     if dt:
         subq = await _get_latest_forecast_media_session_subquery(db_session, dt)
-        query = (
-            query.where(models.ForecastMedia.session_id == subq)
-            # .where(models.ForecastMedia.date == dt)
-        )
+        query = query.where(models.ForecastMedia.session_id == subq)
     else:
-        # XXX possible failure here due to unspecified session name
+        # TODO failure here due to unspecified session name
         session = await get_latest_session(db_session)
         query = query.where(models.ForecastMedia.session_id == session.id)
     forecast_media = (await db_session.execute(query)).scalar()
