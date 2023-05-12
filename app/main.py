@@ -26,7 +26,7 @@ from app.forecasts import get_latest_forecasts
 from app.locations import LocationDep, get_all_locations
 from app.pages import get_latest_page
 from app.scraper.sessions import WEATHER_WARNING_SESSIONS, SessionName
-from app.scraper_sessions import WeatherWarningSessionDep
+from app.scraper_sessions import WeatherWarningSessionDep, get_latest_scraper_session
 from app.utils.api import VmgdApiResponse, render_vmgd_api_response
 from app.utils.datetime import DateDep, now
 from app.weather_warnings import get_latest_weather_warnings
@@ -216,7 +216,7 @@ async def get_locations(
 
 
 @app.get("/v1/pages")
-async def get_pages(
+async def get_raw_pages(
     request: Request,
 ):
     # TODO return list of PageMapping objects we scrape
@@ -224,14 +224,41 @@ async def get_pages(
 
 
 @app.get("/v1/raw/sessions/latest")
-async def get_latest_sessions(
+async def get_raw_latest_sessions(
     request: Request,
     db_session: AsyncSession = Depends(get_db_session),
     *,
-    name: str,
+    # TODO SessionNameDep
+    name: str | None = None,
 ) -> JSONResponse:
-    for name in SessionName:
-        session = await get_latest_scraper_sessions
+    if name:
+        session = await get_latest_scraper_session(db_session, name=SessionName(name))  # HACK will fail with invalid SessionName
+        return schemas.RawSessionResponse(
+            name=name,
+            success=session.completed_at is not None,
+            started_at=session.started_at,
+        )
+    else:
+        scraper_sessions = []
+        for name in SessionName:
+            session = await get_latest_scraper_session(db_session, name=name)
+            if session is None:
+                scraper_sessions.append(
+                    schemas.RawSessionResponse(
+                        name=name.value,
+                        success=False,       
+                        started_at=None,
+                    )
+                )
+            else:
+                scraper_sessions.append(
+                    schemas.RawSessionResponse(
+                        name=name.value,
+                        success=session.completed_at is not None,       
+                        started_at=session.started_at,
+                    )
+                )
+        return scraper_sessions
 
 
 @app.get("/v1/raw/pages")
@@ -242,7 +269,7 @@ async def raw_pages(
     # TODO how to allow user to specify page to return? A PageName enum?
     page = await get_latest_page(db_session)
     data = schemas.RawPageResponse(
-        url=page.url,
+        url=page._path,
         data=page.raw_data,
     )
     return await render_vmgd_api_response(

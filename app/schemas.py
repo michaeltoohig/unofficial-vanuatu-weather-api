@@ -1,4 +1,4 @@
-from dataclasses import field, dataclass
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
@@ -17,6 +17,13 @@ class LocationResponse:
 class RawPageResponse:
     url: str
     data: Any
+
+
+@dataclass
+class RawSessionResponse:
+    name: str
+    success: bool
+    started_at: datetime | None = None  # XXX maybe remove this optional
 
 
 @dataclass

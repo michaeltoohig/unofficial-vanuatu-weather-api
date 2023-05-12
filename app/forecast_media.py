@@ -7,7 +7,7 @@ from loguru import logger
 from app import models
 from app.database import AsyncSession
 from app.scraper.sessions import SessionName
-from app.scraper_sessions import get_latest_session
+from app.scraper_sessions import get_latest_scraper_session
 
 
 async def _get_latest_forecast_media_session_subquery(
@@ -38,8 +38,7 @@ async def get_latest_forecast_media(
         subq = await _get_latest_forecast_media_session_subquery(db_session, dt)
         query = query.where(models.ForecastMedia.session_id == subq)
     else:
-        # TODO failure here due to unspecified session name
-        session = await get_latest_session(db_session)
+        session = await get_latest_scraper_session(db_session, name=SessionName.FORECAST_MEDIA)
         query = query.where(models.ForecastMedia.session_id == session.id)
     forecast_media = (await db_session.execute(query)).scalar()
     return forecast_media

@@ -5,7 +5,7 @@ from loguru import logger
 
 from app import models
 from app.database import AsyncSession
-from app.scraper_sessions import get_latest_session
+from app.scraper_sessions import get_latest_scraper_session
 
 
 async def get_latest_page(
@@ -13,7 +13,7 @@ async def get_latest_page(
     url: str | None = None,
 ) -> models.Page | None:
     # XXX currently would fail to find a page if the latest session doesn't corrospond the desired page
-    session = await get_latest_session(db_session)
+    session = await get_latest_scraper_session(db_session)
     query = select(models.Page).where(models.Page.session_id == session.id)
     if url:
         query = query.where(models.Page.url == url)

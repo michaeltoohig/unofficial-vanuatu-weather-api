@@ -1,14 +1,11 @@
 """Actions related to the VMGD weather warnings."""
 from datetime import datetime, timedelta
-from sqlalchemy import func, select, and_, or_
-from sqlalchemy.orm import aliased
+from sqlalchemy import func, select
 from loguru import logger
 
 from app import models
 from app.database import AsyncSession
 from app.scraper.sessions import WEATHER_WARNING_SESSIONS, SessionName
-from app.scraper_sessions import get_latest_session
-from app.utils.datetime import now
 
 
 async def _get_latest_weather_warning_session_subquery(
@@ -16,6 +13,7 @@ async def _get_latest_weather_warning_session_subquery(
     session_name: SessionName,
     dt: datetime | None,
 ):
+    # TODO review use of this function
     subquery = (
         select(models.Session.id)
         .join(models.Session.weather_warnings)

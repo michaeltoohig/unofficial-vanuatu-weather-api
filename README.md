@@ -37,8 +37,8 @@ High-level steps
 
 Current tasks
 
-- [ ] api endpoint to fetch latest session runs to be used to display latest scraping session status (green/red lights on successful sraping sessions on home page, also helps alert to issues.)
-- [ ] refactor use of `get_latest_session_x` as `get_latest_scraping_session` with options, in general access of latest scraper sessions is a bit messy and all over the place
+- [x] api endpoint to fetch latest session runs to be used to display latest scraping session status (green/red lights on successful sraping sessions on home page, also helps alert to issues.)
+- [x] refactor use of `get_latest_session_x` as `get_latest_scraping_session` with options, in general access of latest scraper sessions is a bit messy and all over the place
 - [ ] improve `/raw/pages` endpoint
 - [ ] bump minor-version
 
