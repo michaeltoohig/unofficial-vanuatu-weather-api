@@ -13,6 +13,7 @@ from app.database import Base
 
 # from app.scraper.sessions import SessionName
 from app.utils.datetime import now, UTCDateTime
+from app.utils.slugify import slugify
 
 if TYPE_CHECKING:
     from app.scraper.pages import PagePath
@@ -156,11 +157,13 @@ class Location(Base):
     updated_at = Column(UTCDateTime(), nullable=False, default=now)
 
     name = Column(String, nullable=False, unique=True)
+    slug = Column(String, nullable=False)  # NOTE unique name will enforce a unique here for our small dataset
     latitude = Column(Float, nullable=False)
     longitude = Column(Float, nullable=False)
 
     def __init__(self, name: str, latitude: float, longitude: float):
         self.name = name
+        self.slug = slugify(name)
         self.latitude = latitude
         self.longitude = longitude
 

@@ -1,12 +1,31 @@
 {% extends "layout.html" %}
 {% block head %}
-<title>Home Page</title>
+<title>{{ forecasts[0].location.name }} Forecast | Vanuatu Weather API</title>
 {% endblock %}
 
 {% block content %}
-Hello World
+{# we are only showing one day forecast at the moment #}
+{% set forecast = forecasts[0] %}
 
-{% for page in pages %}
-{{ page.id }} - {{ page.url }}
-{% endfor %}
+<div class="forecast-wrapper">
+  <div class="forecast">
+    <h1 class="location">{{ forecast.location.name }}</h1>
+    <div class="summary">
+      {{ forecast.date | forecast_date }} is <br/>
+      <span class="description">{{ forecast.summary }}</span>
+    </div>
+    <h2>Temperature</h2>
+    <div class="temperature">
+      {{ forecast.minTemp | degrees | safe }} / {{ forecast.maxTemp | degrees | safe }}
+    </div>
+    <h2>Humidity</h2>
+    <div class="humidity">
+      {{ forecast.minHumi  }}% / {{ forecast.maxHumi  }}%
+    </div>
+    <div class="issued-section">
+      <h3>Issued</h3>
+      <div>{{ forecast.issued_at | vu_datetime }}</div>
+    </div>
+  </div>
+</div>
 {% endblock %}

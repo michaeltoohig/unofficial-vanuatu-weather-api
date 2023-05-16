@@ -4,6 +4,8 @@ from typing import Annotated
 from fastapi import Depends, Query
 import sqlalchemy as sa
 
+TZ_VU = timezone(timedelta(hours=11))  # hardcoded value for our target data source
+
 
 def now() -> datetime:
     return datetime.now(timezone.utc)
@@ -14,9 +16,12 @@ def as_utc(dt: datetime) -> datetime:
 
 
 def as_vu_to_utc(dt: datetime) -> datetime:
-    tz_vu = timezone(timedelta(hours=11))  # hardcoded value for our target data source
-    dt = dt.replace(tzinfo=tz_vu)
+    dt = dt.replace(tzinfo=TZ_VU)
     return dt.astimezone(timezone.utc)
+
+
+def as_vu(dt: datetime) -> datetime:
+    return dt.astimezone(TZ_VU)
 
 
 class UTCDateTime(sa.types.TypeDecorator):

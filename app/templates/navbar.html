@@ -1,0 +1,28 @@
+<nav class="navbar">
+  <!-- LOGO -->
+  <div class="logo">Vanuatu Weather API</div>
+
+  <!-- NAVIGATION MENU -->
+  <ul class="nav-links">
+
+    <!-- NAVIGATION MENUS -->
+    <div class="menu">
+
+      <li><a href="/">Home</a></li>
+      <li><a href="/docs">API</a></li>
+    </div>
+  </ul>
+</nav>
+<div class="status-bar">
+  <div class="status-bar-title">Status:</div>
+  {% for session in scraper_sessions %}
+  <div class="status-indicator" data-completed-at="{{ session.completed_at | format }}">
+    {% if session.completed_at == None %}
+    <span class="session-failure">🗙</span>
+    {% else %}
+    <span class="session-success">✔️</span>
+    {% endif %}
+    <div>{{ session._name | replace("_", " ") | title }}</div>
+  </div>
+  {% endfor %}
+</div>

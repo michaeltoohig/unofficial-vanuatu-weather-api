@@ -11,6 +11,7 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import HTTPException
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.responses import JSONResponse
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
 from starlette.datastructures import Headers, MutableHeaders
@@ -23,10 +24,10 @@ from app.config import DEBUG, ROOT_DIR, VMGD_IMAGE_PATH
 from app.database import AsyncSession, async_session, get_db_session
 from app.forecast_media import get_images_by_session_id, get_latest_forecast_media
 from app.forecasts import get_latest_forecasts
-from app.locations import LocationDep, get_all_locations
+from app.locations import LocationDep, LocationSlugDep, get_all_locations, get_location_by_name
 from app.pages import get_latest_page
 from app.scraper.sessions import WEATHER_WARNING_SESSIONS, SessionName
-from app.scraper_sessions import WeatherWarningSessionDep, get_latest_scraper_session
+from app.scraper_sessions import ScraperSessionDep, WeatherWarningScraperSessionDep, get_latest_scraper_session
 from app.utils.api import VmgdApiResponse, render_vmgd_api_response
 from app.utils.datetime import DateDep, now
 from app.weather_warnings import get_latest_weather_warnings
@@ -174,21 +175,40 @@ async def custom_http_exception_handler(
     return await http_exception_handler(request, exc)
 
 
-@app.get("/")
-async def index(
+@app.get("/", include_in_schema=False)
+async def index_page(
+    request: Request,
+) -> RedirectResponse:
+    return RedirectResponse(request.url_for('forecast_page')) 
+
+
+@app.get("/forecast", include_in_schema=False)
+async def forecast_page(
     request: Request,
     db_session: AsyncSession = Depends(get_db_session),
+    *,
+    location: LocationSlugDep,
 ) -> templates.TemplateResponse:
-    query = select(models.Page)
-    results = await db_session.execute(query)
+    if not location:
+        location = await get_location_by_name(db_session, name="Port Vila")  # default value
+    forecasts = await get_latest_forecasts(db_session, location=location, dt=now())
     return await templates.render_template(
         db_session,
         request,
         "index.html",
         {
-            "pages": results.scalars(),
+            "forecasts": forecasts,
         },
     )
+
+
+@app.get("/about", include_in_schema=False)
+async def about_page(
+    request: Request,
+    db_session: AsyncSession = Depends(get_db_session),
+) -> templates.TemplateResponse:
+    # TODO return about page, explain reason for website, roadmap, etc.
+    raise NotImplementedError
 
 
 @app.get("/ping")
@@ -223,16 +243,21 @@ async def get_raw_pages(
     pass
 
 
-@app.get("/v1/raw/sessions/latest")
+@app.get("/v1/raw/sessions")
 async def get_raw_latest_sessions(
     request: Request,
     db_session: AsyncSession = Depends(get_db_session),
     *,
-    # TODO SessionNameDep
-    name: str | None = None,
+    name: ScraperSessionDep,
 ) -> JSONResponse:
+    """Returns raw results from scraper session table, used to track the 
+    success/failure status of each session as a means to quickly ascertain 
+    an issues exists either in our code or the source material has fundamentally 
+    changed.
+    """
+    # TODO accept `date` query parameter to allow user to select date of sessions' status for historical purposes
     if name:
-        session = await get_latest_scraper_session(db_session, name=SessionName(name))  # HACK will fail with invalid SessionName
+        session = await get_latest_scraper_session(db_session, name=name)
         return schemas.RawSessionResponse(
             name=name,
             success=session.completed_at is not None,
@@ -266,7 +291,11 @@ async def raw_pages(
     request: Request,
     db_session: AsyncSession = Depends(get_db_session),
 ) -> VmgdApiResponse:
-    # TODO how to allow user to specify page to return? A PageName enum?
+    """Returns raw results from a scraper session for each page fetched from the 
+    source material. Useful for historical purposes and verifying our calculated 
+    results are accurate by a 3rd party."""
+    # TODO allow user to add `date` query parameter to view old page data
+    # TODO how to allow user to specify page to return? A PageName enum? Or use SessionName enum?
     page = await get_latest_page(db_session)
     data = schemas.RawPageResponse(
         url=page._path,
@@ -350,7 +379,7 @@ async def weather_warnings_(
     db_session: AsyncSession = Depends(get_db_session),
     *,
     dt: DateDep,
-    session_name: WeatherWarningSessionDep,
+    session_name: WeatherWarningScraperSessionDep,
 ) -> VmgdApiResponse:
     if not dt:
         dt = now()

@@ -31,16 +31,23 @@ async def get_latest_scraper_session(
     return (await db_session.execute(query)).scalar()
 
 
-async def get_warning_weather_session(session_name: str = Query(None, alias="name")):
+async def get_scraper_session_dep(session_name: str = Query(None, alias="name")):
     if session_name is None:
         return None
     try:
         session = SessionName(session_name)
     except ValueError:
-        raise HTTPException(status_code=400, detail="Not a valid weather warning session name")
-    if session not in WEATHER_WARNING_SESSIONS:
-        raise HTTPException(status_code=400, detail="Not a valid weather warning session name")
+        raise HTTPException(status_code=400, detail="Not a valid scraper session name")
     return session
 
 
-WeatherWarningSessionDep = Annotated[SessionName, Depends(get_warning_weather_session)]
+ScraperSessionDep = Annotated[SessionName, Depends(get_scraper_session_dep)]
+
+
+async def get_warning_weather_scraper_session_dep(session: ScraperSessionDep):
+    if session not in WEATHER_WARNING_SESSIONS:
+        raise HTTPException(status_code=400, detail="Not a valid weather warning scraper session name")
+    return session
+
+
+WeatherWarningScraperSessionDep = Annotated[SessionName, Depends(get_warning_weather_scraper_session_dep)]
