@@ -18,7 +18,7 @@ try:
 except ImportError:
     VERSION_COMMIT = get_version_commit()
 
-VERSION = f"0.1.0+{VERSION_COMMIT}"
+VERSION = f"0.2.0+{VERSION_COMMIT}"
 USER_AGENT = f"vmgd-api/{VERSION}"
 
 PROJECT_NAME = "Vanuatu Weather API"
