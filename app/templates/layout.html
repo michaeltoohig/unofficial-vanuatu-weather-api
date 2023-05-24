@@ -6,6 +6,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link rel="stylesheet" href="{{ BASE_URL }}/static/css/main.css?v={{ CSS_HASH }}">
 <link rel="icon" type="image/x-icon" href="{{ BASE_URL }}/static/favicon.ico">
+<script type="text/javascript"> 
+var banner	= (function(){ /*
+ ___ ___ _______ _______ _____
+|   |   |   |   |     __|     \
+|   |   |       |    |  |  --  |
+ \_____/|__|_|__|_______|_____/
+ _______ ______ _______ 
+|   _   |   __ \_     _|
+|       |    __/_|   |_ 
+|___|___|___|  |_______|
+
+Open Source API to the data available on the public VMGD website. Not affiliated with the VMGD. Please source your data directly from https://vmgd.gov.vu/ this website is for demonstration only and not to be used by anyone for anything.
+*/}).toString().split('\n').slice(1, -1).join('\n');
+console.log(banner)
+</script>
 {% block head %}{% endblock %}
 </head>
 <body>
@@ -18,7 +33,7 @@
 
 <footer class="footer">
   <div class="box">
-    API <small class="microblogpub-version"><code>{{ project_version }}</code></small> data sourced from <a href="https://vmgd.gov.vu">Vanuatu Meteorology & Geo-Hazards Department</a>.
+    {{ project_name }} <small class="project-version"><code>{{ project_version }}</code></small> data sourced from <a href="https://vmgd.gov.vu">Vanuatu Meteorology & Geo-Hazards Department</a>.
   </div>
 </footer>
 </body>

@@ -7,3 +7,4 @@ docs/dist/
 requirements.txt
 app/_version.py
 
+.env

@@ -28,8 +28,6 @@ async def get_location_by_slug_dependency(
     db_session: AsyncSession = Depends(get_db_session),
     location_name: str = Query("Port Vila", alias="location"),
 ) -> models.Location:
-    # if location_name is None:
-    #     return None
     slug = slugify(location_name)
     location = await get_location_by_slug(db_session, slug)
     if not location:

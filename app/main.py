@@ -1,7 +1,6 @@
 import os
 import sys
 import time
-from typing import Annotated
 
 from asgiref.typing import ASGI3Application
 from asgiref.typing import ASGIReceiveCallable
@@ -17,10 +16,9 @@ from loguru import logger
 from starlette.datastructures import Headers, MutableHeaders
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.types import Message
-from sqlalchemy import select
 
-from app import models, schemas, templates
-from app.config import DEBUG, ROOT_DIR, VMGD_IMAGE_PATH
+from app import schemas, templates
+from app.config import DEBUG, ROOT_DIR, VMGD_IMAGE_PATH, PROJECT_NAME
 from app.database import AsyncSession, async_session, get_db_session
 from app.forecast_media import get_images_by_session_id, get_latest_forecast_media
 from app.forecasts import get_latest_forecasts
@@ -118,7 +116,7 @@ class CustomMiddleware:
         return None
 
 
-app = FastAPI()  # docs_url=None, redoc_url=None)
+app = FastAPI(title=PROJECT_NAME)  # docs_url=None, redoc_url=None)
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 app.mount(
@@ -211,7 +209,7 @@ async def about_page(
     raise NotImplementedError
 
 
-@app.get("/ping")
+@app.get("/ping", include_in_schema=False)
 async def get_healthcheck(
     request: Request,
 ) -> JSONResponse:
@@ -235,7 +233,7 @@ async def get_locations(
     ]
 
 
-@app.get("/v1/pages")
+@app.get("/v1/pages", include_in_schema=False)
 async def get_raw_pages(
     request: Request,
 ):
@@ -243,75 +241,8 @@ async def get_raw_pages(
     pass
 
 
-@app.get("/v1/raw/sessions")
-async def get_raw_latest_sessions(
-    request: Request,
-    db_session: AsyncSession = Depends(get_db_session),
-    *,
-    name: ScraperSessionDep,
-) -> JSONResponse:
-    """Returns raw results from scraper session table, used to track the 
-    success/failure status of each session as a means to quickly ascertain 
-    an issues exists either in our code or the source material has fundamentally 
-    changed.
-    """
-    # TODO accept `date` query parameter to allow user to select date of sessions' status for historical purposes
-    if name:
-        session = await get_latest_scraper_session(db_session, name=name)
-        return schemas.RawSessionResponse(
-            name=name,
-            success=session.completed_at is not None,
-            started_at=session.started_at,
-        )
-    else:
-        scraper_sessions = []
-        for name in SessionName:
-            session = await get_latest_scraper_session(db_session, name=name)
-            if session is None:
-                scraper_sessions.append(
-                    schemas.RawSessionResponse(
-                        name=name.value,
-                        success=False,       
-                        started_at=None,
-                    )
-                )
-            else:
-                scraper_sessions.append(
-                    schemas.RawSessionResponse(
-                        name=name.value,
-                        success=session.completed_at is not None,       
-                        started_at=session.started_at,
-                    )
-                )
-        return scraper_sessions
-
-
-@app.get("/v1/raw/pages")
-async def raw_pages(
-    request: Request,
-    db_session: AsyncSession = Depends(get_db_session),
-) -> VmgdApiResponse:
-    """Returns raw results from a scraper session for each page fetched from the 
-    source material. Useful for historical purposes and verifying our calculated 
-    results are accurate by a 3rd party."""
-    # TODO allow user to add `date` query parameter to view old page data
-    # TODO how to allow user to specify page to return? A PageName enum? Or use SessionName enum?
-    page = await get_latest_page(db_session)
-    data = schemas.RawPageResponse(
-        url=page._path,
-        data=page.raw_data,
-    )
-    return await render_vmgd_api_response(
-        db_session,
-        request,
-        data,
-        issued=page.issued_at,
-        fetched=page.session.fetched_at,
-    )
-
-
 @app.get("/v1/forecast")
-async def forecast(
+async def get_forecasts(
     request: Request,
     db_session: AsyncSession = Depends(get_db_session),
     *,
@@ -345,7 +276,7 @@ async def forecast(
 
 
 @app.get("/v1/media")
-async def forecast_media_(
+async def get_forecast_media_(
     request: Request,
     db_session: AsyncSession = Depends(get_db_session),
     *,
@@ -374,7 +305,7 @@ async def forecast_media_(
 
 
 @app.get("/v1/warnings")
-async def weather_warnings_(
+async def get_weather_warnings_(
     request: Request,
     db_session: AsyncSession = Depends(get_db_session),
     *,
@@ -415,4 +346,70 @@ async def weather_warnings_(
         issued=issued,
         fetched=fetched,
         skip_warnings=True,
+    )
+
+
+@app.get("/v1/raw/sessions")
+async def get_raw_sessions(
+    request: Request,
+    db_session: AsyncSession = Depends(get_db_session),
+    *,
+    name: ScraperSessionDep,
+) -> JSONResponse:
+    """Returns raw results from a scraper session.
+    Useful to track the success/failure status of each session which we display on our home page.
+    Can help see if our data is up-to-date or if the source material may have changed its format.
+    """
+    # TODO accept `date` query parameter to allow user to select date of sessions' status for historical purposes
+    if name:
+        session = await get_latest_scraper_session(db_session, name=name)
+        return schemas.RawSessionResponse(
+            name=name,
+            success=session.completed_at is not None,
+            started_at=session.started_at,
+        )
+    else:
+        scraper_sessions = []
+        for name in SessionName:
+            session = await get_latest_scraper_session(db_session, name=name)
+            if session is None:
+                scraper_sessions.append(
+                    schemas.RawSessionResponse(
+                        name=name.value,
+                        success=False,       
+                        started_at=None,
+                    )
+                )
+            else:
+                scraper_sessions.append(
+                    schemas.RawSessionResponse(
+                        name=name.value,
+                        success=session.completed_at is not None,       
+                        started_at=session.started_at,
+                    )
+                )
+        return scraper_sessions
+
+
+@app.get("/v1/raw/pages")
+async def get_raw_pages(
+    request: Request,
+    db_session: AsyncSession = Depends(get_db_session),
+) -> VmgdApiResponse:
+    """Returns the raw results from a single scraped page. 
+    Useful for historical purposes and/or verifying our results.
+    """
+    # TODO allow user to add `date` query parameter to view old page data
+    # TODO how to allow user to specify page to return? A PageName enum? Or use SessionName enum?
+    page = await get_latest_page(db_session)
+    data = schemas.RawPageResponse(
+        url=page._path,
+        data=page.raw_data,
+    )
+    return await render_vmgd_api_response(
+        db_session,
+        request,
+        data,
+        issued=page.issued_at,
+        fetched=page.session.fetched_at,
     )

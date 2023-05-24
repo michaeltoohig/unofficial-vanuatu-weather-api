@@ -6,7 +6,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.templating import _TemplateResponse as TemplateResponse
 
 from app import config
-from app.config import DEBUG, VERSION
+from app.config import DEBUG, VERSION, PROJECT_NAME
 from app.database import AsyncSession
 from app.scraper.sessions import SessionName
 from app.scraper_sessions import get_latest_scraper_session
@@ -72,6 +72,7 @@ async def render_template(
             "request": request,
             "debug": DEBUG,
             "project_version": VERSION,
+            "project_name": PROJECT_NAME,
             # "csrf_token": generate_csrf_token(),
             # "highlight_css": HIGHLIGHT_CSS,
             # "notifications_count": await db_session.scalar(

@@ -98,7 +98,8 @@ a {
 
 #main {
   display: flex;
-  flex: 1; }
+  flex: 1;
+  background-image: repeating-linear-gradient(0deg, #F0FDEC 0px, #F0FDEC 1px, transparent 1px, transparent 21px), repeating-linear-gradient(90deg, #F0FDEC 0px, #F0FDEC 1px, transparent 1px, transparent 21px), linear-gradient(90deg, #F0FDEC, #F0FDEC); }
 
 main {
   width: 100%;
@@ -118,10 +119,14 @@ main {
     display: block; }
 
 footer {
+  border-top: #00B100 2px solid;
   width: 100%;
-  max-width: 1000px;
-  margin: 20px auto;
-  color: #555; }
+  margin: 0 auto;
+  padding-top: 20px;
+  padding-bottom: 20px;
+  color: #555;
+  background-color: #F0FDEC;
+  font-size: 18px; }
   footer p {
     margin: 0; }
 
@@ -157,7 +162,9 @@ a.label-btn {
   padding-left: 1em;
   padding-right: 1em;
   background-color: #00B100;
-  color: #151E11; }
+  color: #151E11;
+  background-image: repeating-linear-gradient(135deg, rgba(0, 0, 0, 0.03) 0px, rgba(0, 0, 0, 0.03) 2px, transparent 2px, transparent 4px), linear-gradient(45deg, #00B100, #4C6E42);
+  border-bottom: #00B100 2px solid; }
 
 .nav-links a {
   color: #fff; }
@@ -245,3 +252,104 @@ a.label-btn {
     line-height: 1rem;
     font-size: 1.4rem;
     font-weight: 100; }
+
+/* Tooltip container */
+.tooltip {
+  position: relative;
+  display: inline-block;
+  border-bottom: 1px dotted black;
+  /* If you want dots under the hoverable text */ }
+
+/* Tooltip text */
+.tooltip .tooltiptext {
+  animation-duration: 0.5s;
+  visibility: hidden;
+  width: 320px;
+  background-color: #555;
+  color: #fff;
+  text-align: center;
+  padding: 5px 0;
+  border-radius: 6px;
+  /* Position the tooltip text */
+  position: absolute;
+  z-index: 1;
+  top: 125%;
+  left: 50%;
+  margin-left: -60px;
+  /* Fade in tooltip */
+  opacity: 0;
+  transition: opacity 0.3s; }
+
+/* Tooltip arrow */
+.tooltip .tooltiptext::after {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  margin-left: -5px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: #555 transparent transparent transparent; }
+
+/* Show the tooltip text when you mouse over the tooltip container */
+.tooltip:hover .tooltiptext {
+  visibility: visible;
+  opacity: 1; }
+
+.bg-circles {
+  width: 100vw;
+  height: 100vh;
+  position: absolute;
+  overflow: hidden;
+  display: flex;
+  place-content: center;
+  z-index: 0; }
+  .bg-circles .circle {
+    position: absolute;
+    border-radius: 50%;
+    background: #00B100;
+    animation: ripple 15s infinite;
+    box-shadow: 0 1px 0 0; }
+  .bg-circles .circle-xs {
+    --size: 100px;
+    width: var(--size);
+    height: var(--size);
+    bottom: calc((-1 * var(--size) / 2) - 10vh);
+    filter: blur(calc(var(--size) / 100));
+    opacity: 0.7; }
+  .bg-circles .circle-sm {
+    --size: 200px;
+    width: var(--size);
+    height: var(--size);
+    bottom: calc((-1 * var(--size) / 2) - 10vh);
+    filter: blur(calc(var(--size) / 100));
+    opacity: 0.5; }
+  .bg-circles .circle-md {
+    --size: 330px;
+    width: var(--size);
+    height: var(--size);
+    bottom: calc((-1 * var(--size) / 2) - 10vh);
+    filter: blur(calc(var(--size) / 100));
+    opacity: 0.4; }
+  .bg-circles .circle-lg {
+    --size: 700px;
+    width: var(--size);
+    height: var(--size);
+    bottom: calc((-1 * var(--size) / 2) - 10vh);
+    filter: blur(calc(var(--size) / 100));
+    opacity: 0.2; }
+  .bg-circles .circle-xl {
+    --size: 1200px;
+    width: var(--size);
+    height: var(--size);
+    bottom: calc((-1 * var(--size) / 2) - 10vh);
+    filter: blur(calc(var(--size) / 100));
+    opacity: 0.1; }
+
+@keyframes ripple {
+  0% {
+    transform: scale(0.8); }
+  50% {
+    transform: scale(1.2); }
+  100% {
+    transform: scale(0.8); } }
