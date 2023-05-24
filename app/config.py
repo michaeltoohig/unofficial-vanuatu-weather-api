@@ -2,12 +2,14 @@ import hashlib
 import os
 from pathlib import Path
 
+from dotenv import dotenv_values
 from pydantic import BaseModel
 
 from app.version import get_version_commit
 
-
 ROOT_DIR = Path().parent.resolve()
+
+_CONFIG_FILE = os.getenv("VMGD_API_CONFIG_FILE", ".env")
 
 VERSION_COMMIT = "dev"
 
@@ -19,6 +21,8 @@ except ImportError:
 VERSION = f"0.1.0+{VERSION_COMMIT}"
 USER_AGENT = f"vmgd-api/{VERSION}"
 
+PROJECT_NAME = "Vanuatu Weather API"
+
 # Force reloading cache when the CSS is updated
 CSS_HASH = "none"
 try:
@@ -27,9 +31,8 @@ try:
 except FileNotFoundError:
     pass
 
-
 class Config(BaseModel):
-    domain: str = "localhost:8000"
+    domain: str
     https: bool = False
     debug: bool = True
     sqlalchemy_database: str | None = None
@@ -41,24 +44,22 @@ class Config(BaseModel):
 
     vmgd_image_path: str | None = None
 
-# def load_config() -> Config:
-#     try:
-#         return Config.parse_obj(
-#             tomli.loads((ROOT_DIR / "data" / _CONFIG_FILE).read_text())
-#         )
-#     except FileNotFoundError:
-#         raise ValueError(
-#             f"Please run the configuration wizard, {_CONFIG_FILE} is missing"
-#         )
+def load_config() -> Config:
+    try:
+        return Config.parse_obj(dotenv_values(ROOT_DIR / "data" / _CONFIG_FILE))
+    except FileNotFoundError:
+        raise ValueError(
+            f"Please run the configuration wizard, {_CONFIG_FILE} is missing"
+        )
 
-# CONFIG = load_config()
-CONFIG = Config()
+CONFIG = load_config()
 
 DOMAIN = CONFIG.domain
 _SCHEME = "https" if CONFIG.https else "http"
 BASE_URL = f"{_SCHEME}://{DOMAIN}"
 
 DEBUG = CONFIG.debug
+print(DEBUG)
 DB_PATH = CONFIG.sqlalchemy_database or ROOT_DIR / "data" / "db.sqlite"
 SQLALCHEMY_DATABASE_URL = f"sqlite:///{DB_PATH}"
 
