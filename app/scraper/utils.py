@@ -43,7 +43,7 @@ def _save_html(html: str, fp: Path) -> None:
 async def fetch(url: str) -> str:
     logger.info(f"Fetching {url}")
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=config.VMGD_TIMEOUT) as client:
         resp = await client.get(
             url,
             headers={
