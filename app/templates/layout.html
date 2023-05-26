@@ -6,21 +6,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link rel="stylesheet" href="{{ BASE_URL }}/static/css/main.css?v={{ CSS_HASH }}">
 <link rel="icon" type="image/x-icon" href="{{ BASE_URL }}/static/favicon.ico">
-<script type="text/javascript"> 
-var banner	= (function(){ /*
- ___ ___ _______ _______ _____
-|   |   |   |   |     __|     \
-|   |   |       |    |  |  --  |
- \_____/|__|_|__|_______|_____/
- _______ ______ _______ 
-|   _   |   __ \_     _|
-|       |    __/_|   |_ 
-|___|___|___|  |_______|
-
-Open Source API to the data available on the public VMGD website. Not affiliated with the VMGD. Please source your data directly from https://vmgd.gov.vu/ this website is for demonstration only and not to be used by anyone for anything.
-*/}).toString().split('\n').slice(1, -1).join('\n');
-console.log(banner)
-</script>
 {% block head %}{% endblock %}
 </head>
 <body>
@@ -36,5 +21,96 @@ console.log(banner)
     {{ project_name }} <small class="project-version"><code>{{ project_version }}</code></small> data sourced from <a href="https://vmgd.gov.vu">Vanuatu Meteorology & Geo-Hazards Department</a>.
   </div>
 </footer>
+
+<script type="text/javascript"> 
+var banner	= (function(){ /*
+ ___ ___ _______ _______ _____
+|   |   |   |   |     __|     \
+|   |   |       |    |  |  --  |
+ \_____/|__|_|__|_______|_____/
+ _______ ______ _______ 
+|   _   |   __ \_     _|
+|       |    __/_|   |_ 
+|___|___|___|  |_______|
+
+Open Source API to the data available on the public VMGD website. Not affiliated with the VMGD. Please source your data directly from https://vmgd.gov.vu/ this website is for demonstration only and not to be used by anyone for anything.
+*/}).toString().split('\n').slice(1, -1).join('\n');
+console.log(banner)
+</script>
+<script src="https://unpkg.com/@popperjs/core@2"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // Get all scraping session status elements
+    var elems = document.querySelectorAll('.status-indicator');
+
+    // Loop through each element and create a tooltip
+    elems.forEach(function(element) {
+      var tooltip = document.createElement('div');
+      tooltip.classList.add('tooltip');
+      var completedAt = element.dataset.completedAt;
+      if (element.dataset.success) {
+        tooltip.innerHTML = `Last Run ${completedAt}`;
+      } else {
+        tooltip.innerHTML = `Last Run Failed ${completedAt}`;
+      }
+
+      // Create a Popper.js instance to attach the tooltip to the element
+      var popperInstance = Popper.createPopper(element, tooltip, {
+        placement: 'bottom',
+        modifiers: [
+          {
+            offset: {
+              offset: '0, 1'
+            }
+          }
+        ]
+      })
+
+      function show() {
+        // Make the tooltip visible
+        tooltip.setAttribute('data-show', '');
+
+        // Enable the event listeners
+        popperInstance.setOptions((options) => ({
+          ...options,
+          modifiers: [
+            ...options.modifiers,
+            { name: 'eventListeners', enabled: true },
+          ],
+        }));
+
+        // Update its position
+        popperInstance.update();
+      }
+
+      function hide() {
+        // Hide the tooltip
+        tooltip.removeAttribute('data-show');
+
+        // Disable the event listeners
+        popperInstance.setOptions((options) => ({
+          ...options,
+          modifiers: [
+            ...options.modifiers,
+            { name: 'eventListeners', enabled: false },
+          ],
+        }));
+      }
+
+      const showEvents = ['mouseenter', 'focus'];
+      const hideEvents = ['mouseleave', 'blur'];
+
+      showEvents.forEach((event) => {
+        element.addEventListener(event, show);
+      });
+
+      hideEvents.forEach((event) => {
+        element.addEventListener(event, hide);
+      });
+      
+      element.appendChild(tooltip);
+    });
+  })
+</script>
 </body>
 </html>

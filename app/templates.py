@@ -6,7 +6,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.templating import _TemplateResponse as TemplateResponse
 
 from app import config
-from app.config import DEBUG, VERSION, PROJECT_NAME
+from app.config import DEBUG, PROJECT_REPO, VERSION, PROJECT_NAME
 from app.database import AsyncSession
 from app.scraper.sessions import SessionName
 from app.scraper_sessions import get_latest_scraper_session
@@ -66,6 +66,8 @@ async def render_template(
         ss = await get_latest_scraper_session(db_session, name=sn)
         scraper_sessions.append(ss)
 
+    github_icon = request.url_for("static", path="github.svg")
+
     return _templates.TemplateResponse(
         template,
         {
@@ -73,6 +75,8 @@ async def render_template(
             "debug": DEBUG,
             "project_version": VERSION,
             "project_name": PROJECT_NAME,
+            "project_repo": PROJECT_REPO,
+            "github_icon": github_icon,
             # "csrf_token": generate_csrf_token(),
             # "highlight_css": HIGHLIGHT_CSS,
             # "notifications_count": await db_session.scalar(

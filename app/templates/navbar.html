@@ -9,7 +9,8 @@
     <div class="menu">
 
       <li><a href="/">Home</a></li>
-      <li><a href="/docs">API</a></li>
+      <li><a href="/docs" target="_blank">API</a></li>
+      <li><a href="{{ project_repo }}" target="_blank"><img src="{{ github_icon }}" /></a></li>
     </div>
   </ul>
 </nav>
@@ -18,14 +19,13 @@
     Status:
   </div>
   {% for session in scraper_sessions %}
-  <div class="status-indicator tooltip" data-completed-at="{{ session.completed_at | format }}">
+  <div class="status-indicator" data-completed-at="{{ session.completed_at | vu_datetime if session.completed_at else '' }}" data-success="{{ 'true' if session.completed_at else 'false' }}">
     {% if session.completed_at == None %}
     <span class="session-failure">🗙</span>
     {% else %}
     <span class="session-success">✔️</span>
     {% endif %}
     <div>{{ session._name | replace("_", " ") | title }}</div>
-    <span class="tooltiptext">Last Run {{ session.completed_at | vu_datetime }}</span>
   </div>
   {% endfor %}
 </div>

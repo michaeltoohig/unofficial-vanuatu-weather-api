@@ -32,6 +32,7 @@ except FileNotFoundError:
     pass
 
 class Config(BaseModel):
+    project_repo: str
     domain: str
     https: bool = False
     debug: bool = True
@@ -53,6 +54,8 @@ def load_config() -> Config:
         )
 
 CONFIG = load_config()
+
+PROJECT_REPO = CONFIG.project_repo
 
 DOMAIN = CONFIG.domain
 _SCHEME = "https" if CONFIG.https else "http"
