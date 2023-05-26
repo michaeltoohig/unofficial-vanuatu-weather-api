@@ -189,9 +189,8 @@ a.label-btn {
   padding: 5px 12px;
   list-style-type: none; }
 
-.menu li img {
+.github-icon {
   height: 2rem;
-  margin-top: 0.2rem;
 }
 
 .status-bar {
