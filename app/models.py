@@ -1,7 +1,6 @@
 from datetime import datetime
 import json
 from pathlib import Path
-from tkinter import N
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import Boolean, Column, Float, ForeignKey, Integer, String
