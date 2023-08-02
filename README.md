@@ -6,6 +6,19 @@ However, for no technical reason, I've limited the scope of the project to only 
 
 ## Development
 
+First setup the environment file.
+Update the values as needed.
+
+```
+cp ./data/.env.template ./data/.env
+```
+
+Then run the database migrations.
+
+```
+alembic upgrade head
+```
+
 Project commands are found in the `manage.py` file.
 
 To start the dev server:
