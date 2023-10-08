@@ -1,7 +1,6 @@
 """Actions related to the VMGD weather warnings."""
 from datetime import datetime, timedelta
-from sqlalchemy import func, select
-from loguru import logger
+from sqlalchemy import select
 
 from app import models
 from app.database import AsyncSession

@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta, timezone, time
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 from fastapi import Depends, Query
@@ -11,8 +11,8 @@ def now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def as_utc(dt: datetime) -> datetime:
-    return dt.replace(tzinfo=timezone.utc)
+# def as_utc(dt: datetime) -> datetime:
+#     return dt.replace(tzinfo=timezone.utc)
 
 
 def as_vu_to_utc(dt: datetime) -> datetime:

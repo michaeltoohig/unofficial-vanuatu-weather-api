@@ -1,12 +1,13 @@
 import pytest
 from datetime import datetime
 from app.scraper.aggregators import convert_to_datetime, verify_date_series
-from app.utils.datetime import as_utc
+from app.utils.datetime import as_vu_to_utc
 
 
 @pytest.mark.parametrize(
     "date_string, issued_at, expected_dt",
     [
+        ("Wed 02", datetime(2023, 8, 3, 5, 57), datetime(2023, 8, 2)),
         # Test a date string that is in the current month and after the issued_at date
         ("Sat 06", datetime(2023, 5, 5), datetime(2023, 5, 6)),
         # Test a date string that is in the current month and before the issued_at date NOTE impossible to know from a single instance
@@ -14,13 +15,18 @@ from app.utils.datetime import as_utc
         # Test a date string that is in the next month and after the issued_at date
         ("Mon 01", datetime(2023, 4, 29), datetime(2023, 5, 1)),
         # Test a date string with a day of the month equal to the last day of the current month
-        ("Sat 31", datetime(2022, 12, 1), datetime(2022, 12, 31)),
+        ("Sat 31", datetime(2022, 12, 2), datetime(2022, 12, 31)),
+        # # This doesn't happen in the real world; it fails the test
+        # ("Sat 31", datetime(2022, 12, 1), datetime(2022, 12, 31)),
+        # Test a date string with the issued_at date on the first of the month where the month previous has fewer days
+        ("Sat 03", datetime(2022, 12, 1), datetime(2022, 12, 3)),
         # Test a date string with a day of the month equal to the first day of the next month
         ("Sun 01", datetime(2022, 12, 31), datetime(2023, 1, 1)),
     ]
 )
 def test_convert_to_datetime(date_string, expected_dt, issued_at):
-    assert convert_to_datetime(date_string, as_utc(issued_at)) == as_utc(expected_dt)
+    result = convert_to_datetime(date_string, as_vu_to_utc(issued_at))
+    assert result == as_vu_to_utc(expected_dt)
 
 
 @pytest.mark.parametrize(

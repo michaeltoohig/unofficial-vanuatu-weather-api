@@ -17,13 +17,6 @@ from app.scraper.aggregators import (
 )
 
 
-@dataclass
-class SessionMapping:
-    name: str
-    pages: list[PageMapping]
-    process: callable  # processes results from PageMappings
-
-
 class SessionName(enum.Enum):
     FORECAST_GENERAL = "forecast_general"
     FORECAST_MEDIA = "forecast_media"
@@ -31,6 +24,13 @@ class SessionName(enum.Enum):
     WARNING_MARINE = "warning_marine"
     WARNING_HIGHT_SEAS = "warning_hight_seas"
     WARNING_SEVERE_WEATHER = "warning_severe_weather"
+
+
+@dataclass
+class SessionMapping:
+    name: SessionName
+    pages: list[PageMapping]
+    process: callable  # processes results from PageMappings
 
 
 WEATHER_WARNING_SESSIONS = [
@@ -59,7 +59,7 @@ session_mappings = [
         name=SessionName.WARNING_BULLETIN,
         pages=[PageMapping(PagePath.WARNING_BULLETIN, scrape_current_bulletin)],
         process=aggregate_weather_warnings,
-    ),   
+    ),
     SessionMapping(
         name=SessionName.WARNING_MARINE,
         pages=[PageMapping(PagePath.WARNING_MARINE, scrape_weather_warnings)],

@@ -1,6 +1,6 @@
-from datetime import datetime
+# from datetime import datetime
 from typing import TYPE_CHECKING
-import base64
+# import base64
 from pathlib import Path
 
 import httpx
@@ -12,7 +12,6 @@ from app.scraper.exceptions import (
     PageNotFoundError,
     PageUnavailableError,
 )
-from app.utils.datetime import as_vu_to_utc
 
 if TYPE_CHECKING:
     from app.scraper.pages import PageMapping

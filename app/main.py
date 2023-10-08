@@ -190,12 +190,19 @@ async def forecast_page(
     if not location:
         location = await get_location_by_name(db_session, name="Port Vila")  # default value
     forecasts = await get_latest_forecasts(db_session, location=location, dt=now())
+    warnings = []
+    # TODO warnings ticker
+    # for wws in WEATHER_WARNING_SESSIONS:
+    #     ww = await get_latest_weather_warnings(db_session, session_name=wws, dt=now())
+    #     if ww:
+    #         warnings.extend(ww)
     return await templates.render_template(
         db_session,
         request,
         "index.html",
         {
             "forecasts": forecasts,
+            "warnings": warnings,
         },
     )
 

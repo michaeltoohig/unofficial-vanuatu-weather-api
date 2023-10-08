@@ -11,7 +11,7 @@ from app.locations import save_forecast_location
 from app.models import ForecastDaily, ForecastMedia, Location, Page, Session, WeatherWarning
 from app.scraper.schemas import WeatherObject
 from app.scraper.scrapers import NO_CURRENT_WARNING
-from app.utils.datetime import as_utc, as_vu_to_utc, now
+from app.utils.datetime import as_vu_to_utc, now
 
 
 @dataclass(frozen=True, kw_only=True)

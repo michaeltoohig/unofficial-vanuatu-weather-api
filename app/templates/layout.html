@@ -10,6 +10,14 @@
 </head>
 <body>
 {% include "navbar.html" %}
+{# TODO warnings ticker #}
+{% if warnings and False %}
+<div id="warnings">
+  {% for warning in warnings %}
+  {{ warning.session }}
+  {% endfor %}
+</div>
+{% endif %}
 <div id="main">
 <main{%- block main_tag %}{%- endblock %}>
 {% block content %}{% endblock %}

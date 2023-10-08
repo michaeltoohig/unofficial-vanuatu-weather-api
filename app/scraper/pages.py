@@ -26,8 +26,7 @@ class PagePath(enum.Enum):
 class PageMapping:
     path: PagePath
     process: callable
-    scraper: callable = None
-    # process_images: callable | None  # TODO decide how to handle pages that have images.
+    # scraper: callable = None  # I think this is unused
 
     @property
     def url(self):
