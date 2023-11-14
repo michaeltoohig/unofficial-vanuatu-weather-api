@@ -1,4 +1,4 @@
-# legendary-winner-vmgd
+# Unofficial VMGD API
 
 A web scraper and API for the Vanuatu Meteorology & Geo-Hazards Department (VMGD) website.
 The goal of this project is to provide VMGD data in a machine readable format.
