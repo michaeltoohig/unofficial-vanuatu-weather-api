@@ -1,5 +1,5 @@
 #! /usr/bin/env python
-from pathlib import Path
+# from pathlib import Path
 import signal
 import subprocess
 import anyio
@@ -13,7 +13,7 @@ def run(cmdline):
     except KeyboardInterrupt:
         p.send_signal(signal.SIGINT)
         p.wait()
-    
+
 
 @click.group()
 def cli():
@@ -28,12 +28,12 @@ def compile_scss(watch):
     else:
         cmdline = ["boussole", "compile"]
     run(cmdline)
-        
+
 
 @cli.command(context_settings={"ignore_unknown_options": True})
 def dev():
     run(["uvicorn", "app.main:app", "--reload"])
-    
+
 
 @cli.command()
 def scrape():
@@ -44,3 +44,4 @@ def scrape():
 
 if __name__ == "__main__":
     cli()
+
