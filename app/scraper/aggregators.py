@@ -1,17 +1,25 @@
 """Functions that handle the messy work of aggregating and cleaning the results of scrapers."""
+
 import re
 from dataclasses import asdict, dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dateutil.relativedelta import relativedelta
 
 from loguru import logger
 
 from app.database import AsyncSession
 from app.locations import save_forecast_location
-from app.models import ForecastDaily, ForecastMedia, Location, Page, Session, WeatherWarning
+from app.models import (
+    ForecastDaily,
+    ForecastMedia,
+    Location,
+    Page,
+    Session,
+    WeatherWarning,
+)
 from app.scraper.schemas import WeatherObject
 from app.scraper.scrapers import NO_CURRENT_WARNING
-from app.utils.datetime import as_utc, as_vu_to_utc, now
+from app.utils.datetime import as_utc, as_vu, as_vu_to_utc, now
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -55,13 +63,18 @@ def convert_to_datetime(date_string: str, issued_at: datetime) -> datetime:
      - the `date_string` is never representing a value greater than 1 month after the `issued_at` date
      - the `issued_at` value should generally be after the or equal to the `date_string`
     """
+    assert issued_at.tzinfo == timezone.utc, "Non UTC timezone provided to function"
     day = int(date_string.split()[1])
-    if day < issued_at.day:
+    vu_anchor_dt = as_vu(
+        issued_at
+    )  # get datetime values as it was on VMGD website in VU timezone
+    if day < vu_anchor_dt.day:  # issued_at.day:
         # we have wrapped around to a new month/year
-        next_month = issued_at + relativedelta(months=1)
+        next_month = vu_anchor_dt + relativedelta(months=1)
         dt = datetime(next_month.year, next_month.month, day)
     else:
-        dt = datetime(issued_at.year, issued_at.month, day)
+        dt = datetime(vu_anchor_dt.year, vu_anchor_dt.month, day)
+    # return UTC datetime again
     return as_vu_to_utc(dt)
 
 
@@ -141,17 +154,19 @@ async def aggregate_forecast_week(
             db_session.add(forecast)
 
 
-async def aggregate_forecast_media(db_session: AsyncSession, session: Session, pages: list[Page]):
+async def aggregate_forecast_media(
+    db_session: AsyncSession, session: Session, pages: list[Page]
+):
     """Handles data from forecast media.
     In the future we may OCR the images but for now its simple."""
     assert len(pages) == 1, "Unexpected items in pages list"
     page = pages[0]
-    summary = re.sub(' +', ' ', page.raw_data)
+    summary = re.sub(" +", " ", page.raw_data)
     forecast_media = ForecastMedia(
         session_id=session.id,
         issued_at=page.issued_at,
         summary=summary,
-    ) 
+    )
     db_session.add(forecast_media)
 
 

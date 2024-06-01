@@ -78,9 +78,10 @@ async def process_page_mapping(db_session: AsyncSession, mapping: PageMapping):
 
 # async def handle_processing_session_mapping_error ???
 
+
 async def process_page_image(page, elem) -> Path:
     """Save contents of image element to local storage."""
-    src = elem['src']
+    src = elem["src"]
     assert src is not None, "image element must have a src attribute"
 
     file_id = uuid.uuid4()
@@ -117,7 +118,9 @@ async def process_session_mapping(session_mapping: SessionMapping):
             for mapping in session_mapping.pages:
                 logger.info(f"page url {mapping.url}")
                 scraping_result = await process_page_mapping(db_session, mapping)
-                if scraping_result.issued_at is None: # page did not provide issued_at; assume page is up-to-date
+                if (
+                    scraping_result.issued_at is None
+                ):  # page did not provide issued_at; assume page is up-to-date
                     scraping_result.issued_at = session.fetched_at
                 page = models.Page(
                     path=mapping.path,

@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta, timezone, time
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 from fastapi import Depends, Query
@@ -28,15 +28,22 @@ class UTCDateTime(sa.types.TypeDecorator):
 
     impl = sa.types.DateTime(timezone=True)
     cache_ok = True
+
     def process_bind_param(self, value, engine):
         if value is not None:
             return value.astimezone(timezone.utc)
+
     def process_result_value(self, value, engine):
         if value is not None:
             return value.replace(tzinfo=timezone.utc)
 
 
-def get_datetime_dependency(date: str = Query(None, regex="^(\d{4}-\d{2}-\d{2})|(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6})|(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}Z)|([+-]\\d{2}:\\d{2})$")):
+def get_datetime_dependency(
+    date: str = Query(
+        None,
+        regex="^(\d{4}-\d{2}-\d{2})|(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6})|(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}Z)|([+-]\\d{2}:\\d{2})$",
+    )
+):
     """
     Returns UTC datetime from ISO formatted datetime string in query.
     """
@@ -53,7 +60,7 @@ def get_datetime_dependency(date: str = Query(None, regex="^(\d{4}-\d{2}-\d{2})|
         except ValueError:
             # Parse as ISO datetime with timezone
             parsed_date = datetime.strptime(date, "%Y-%m-%dT%H:%M:%S.%f%z")
-    
+
     # Convert to UTC datetime
     d = parsed_date.astimezone(timezone.utc)
     print(d)

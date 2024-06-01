@@ -1,3 +1,5 @@
+# TODO: rename this file
+#
 from datetime import datetime
 from typing import Any
 from dataclasses import dataclass, field
@@ -6,7 +8,7 @@ from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import config
-from app.schemas import WeatherWarningResponse
+from app.api.responses import WeatherWarningResponse
 from app.weather_warnings import get_latest_weather_warnings
 
 

@@ -32,7 +32,7 @@ def compile_scss(watch):
 
 @cli.command(context_settings={"ignore_unknown_options": True})
 def dev():
-    run(["uvicorn", "app.main:app", "--reload"])
+    run(["uvicorn", "app.api.main:app", "--reload"])
 
 
 @cli.command()
@@ -44,4 +44,3 @@ def scrape():
 
 if __name__ == "__main__":
     cli()
-

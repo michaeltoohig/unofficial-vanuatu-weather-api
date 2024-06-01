@@ -22,21 +22,26 @@ _templates = Jinja2Templates(
 
 def forecast_date(value: datetime):
     if value.date() == now().date():
-        return 'Today'
+        return "Today"
     elif value.date() == now().date() + timedelta(days=1):
-        return 'Tomorrow'
+        return "Tomorrow"
     else:
-        return value.strftime('%A, %d %B')
+        return value.strftime("%A, %d %B")
+
 
 def degrees(value: str):
     """Returns given temperature value as HTML ready string with superscript degrees C."""
     # alternative to ° is ℃
-    value = int(value)  # sanity check to be sure we only get integers since I don't want to call `safe` on the results of this if strings are passed
+    value = int(
+        value
+    )  # sanity check to be sure we only get integers since I don't want to call `safe` on the results of this if strings are passed
     return f"{value}<small><sup>℃</sup></small>"
+
 
 # def vu_date_str(value):
 #     dt = as_vu(value)
 #     return dt.strftime("%Y %B %d")
+
 
 def vu_datetime_str(value):
     dt = as_vu(value)

@@ -5,7 +5,7 @@ import pytest_asyncio
 from fastapi.testclient import TestClient
 
 from app.database import Base, async_engine, async_session, engine
-from app.main import app
+from app.api.main import app
 from tests.factories import _Session
 
 

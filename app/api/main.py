@@ -17,16 +17,29 @@ from starlette.datastructures import Headers, MutableHeaders
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.types import Message
 
-from app import schemas, templates
+from app.api import responses, templates
+from app.api.locations import (
+    LocationDep,
+    LocationSlugDep,
+)
+from app.api.scraper_sessions import (
+    ScraperSessionDep,
+    WeatherWarningScraperSessionDep,
+)
 from app.config import DEBUG, ROOT_DIR, VMGD_IMAGE_PATH, PROJECT_NAME
 from app.database import AsyncSession, async_session, get_db_session
 from app.forecast_media import get_images_by_session_id, get_latest_forecast_media
 from app.forecasts import get_latest_forecasts
-from app.locations import LocationDep, LocationSlugDep, get_all_locations, get_location_by_name
+from app.locations import (
+    get_all_locations,
+    get_location_by_name,
+)
 from app.pages import get_latest_page
 from app.scraper.sessions import WEATHER_WARNING_SESSIONS, SessionName
-from app.scraper_sessions import ScraperSessionDep, WeatherWarningScraperSessionDep, get_latest_scraper_session
-from app.utils.api import VmgdApiResponse, render_vmgd_api_response
+from app.scraper_sessions import (
+    get_latest_scraper_session,
+)
+from app.api.utils import VmgdApiResponse, render_vmgd_api_response
 from app.utils.datetime import DateDep, now
 from app.weather_warnings import get_latest_weather_warnings
 
@@ -65,9 +78,9 @@ class CustomMiddleware:
                 headers = MutableHeaders(scope=message)
                 headers["X-Request-ID"] = request_id
                 # headers["x-powered-by"] = "microblogpub"
-                headers[
-                    "referrer-policy"
-                ] = "no-referrer, strict-origin-when-cross-origin"
+                headers["referrer-policy"] = (
+                    "no-referrer, strict-origin-when-cross-origin"
+                )
                 headers["x-content-type-options"] = "nosniff"
                 headers["x-xss-protection"] = "1; mode=block"
                 headers["x-frame-options"] = "DENY"
@@ -118,7 +131,7 @@ class CustomMiddleware:
 
 app = FastAPI(title=PROJECT_NAME)  # docs_url=None, redoc_url=None)
 
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
+app.mount("/static", StaticFiles(directory="app/api/static"), name="static")
 app.mount(
     "/images",
     StaticFiles(directory=str(VMGD_IMAGE_PATH.relative_to(ROOT_DIR))),
@@ -177,7 +190,7 @@ async def custom_http_exception_handler(
 async def index_page(
     request: Request,
 ) -> RedirectResponse:
-    return RedirectResponse(request.url_for('forecast_page')) 
+    return RedirectResponse(request.url_for("forecast_page"))
 
 
 @app.get("/forecast", include_in_schema=False)
@@ -188,7 +201,9 @@ async def forecast_page(
     location: LocationSlugDep,
 ) -> templates.TemplateResponse:
     if not location:
-        location = await get_location_by_name(db_session, name="Port Vila")  # default value
+        location = await get_location_by_name(
+            db_session, name="Port Vila"
+        )  # default value
     forecasts = await get_latest_forecasts(db_session, location=location, dt=now())
     return await templates.render_template(
         db_session,
@@ -220,10 +235,10 @@ async def get_healthcheck(
 async def get_locations(
     requiest: Request,
     db_session: AsyncSession = Depends(get_db_session),
-) -> list[schemas.LocationResponse]:
+) -> list[responses.LocationResponse]:
     locations = await get_all_locations(db_session)
     return [
-        schemas.LocationResponse(
+        responses.LocationResponse(
             id=l.id,
             name=l.name,
             latitude=l.latitude,
@@ -253,7 +268,7 @@ async def get_forecasts(
     if not forecasts:
         raise HTTPException(status_code=404, detail="No forecast data available")
     data = [
-        schemas.ForecastResponse(
+        responses.ForecastResponse(
             location=f.location.id,
             date=f.date,
             summary=f.summary,
@@ -289,7 +304,7 @@ async def get_forecast_media_(
         raise HTTPException(status_code=404, detail="No forecast data available")
 
     images = await get_images_by_session_id(db_session, forecast_media.session_id)
-    data = schemas.ForecastMediaResponse(
+    data = responses.ForecastMediaResponse(
         summary=forecast_media.summary,
         images=[img._server_filepath for img in images] if images is not None else [],
     )
@@ -330,7 +345,7 @@ async def get_weather_warnings_(
     if not weather_warnings:
         raise HTTPException(status_code=404, detail="No weather warning data available")
     data = [
-        schemas.WeatherWarningResponse(
+        responses.WeatherWarningResponse(
             date=w.date,
             name=w.session._name,
             body=w.body,
@@ -363,7 +378,7 @@ async def get_raw_sessions(
     # TODO accept `date` query parameter to allow user to select date of sessions' status for historical purposes
     if name:
         session = await get_latest_scraper_session(db_session, name=name)
-        return schemas.RawSessionResponse(
+        return responses.RawSessionResponse(
             name=name,
             success=session.completed_at is not None,
             started_at=session.started_at,
@@ -374,17 +389,17 @@ async def get_raw_sessions(
             session = await get_latest_scraper_session(db_session, name=name)
             if session is None:
                 scraper_sessions.append(
-                    schemas.RawSessionResponse(
+                    responses.RawSessionResponse(
                         name=name.value,
-                        success=False,       
+                        success=False,
                         started_at=None,
                     )
                 )
             else:
                 scraper_sessions.append(
-                    schemas.RawSessionResponse(
+                    responses.RawSessionResponse(
                         name=name.value,
-                        success=session.completed_at is not None,       
+                        success=session.completed_at is not None,
                         started_at=session.started_at,
                     )
                 )
@@ -396,13 +411,13 @@ async def get_raw_pages(
     request: Request,
     db_session: AsyncSession = Depends(get_db_session),
 ) -> VmgdApiResponse:
-    """Returns the raw results from a single scraped page. 
+    """Returns the raw results from a single scraped page.
     Useful for historical purposes and/or verifying our results.
     """
     # TODO allow user to add `date` query parameter to view old page data
     # TODO how to allow user to specify page to return? A PageName enum? Or use SessionName enum?
     page = await get_latest_page(db_session)
-    data = schemas.RawPageResponse(
+    data = responses.RawPageResponse(
         url=page._path,
         data=page.raw_data,
     )
