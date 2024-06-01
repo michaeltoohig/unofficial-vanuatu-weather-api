@@ -24,13 +24,21 @@ Project commands are found in the `manage.py` file.
 To start the dev server:
 
 ```
-./manage.py dev
+python manage.py dev
 ```
 
 To watch changes to scss files:
 
 ```
-./manage.py compile-scss --watch
+python manage.py compile-scss --watch
+```
+
+## Tests
+
+Run pytest.
+
+```
+pytest tests/
 ```
 
 ## TODO
@@ -40,6 +48,17 @@ Features
 - [ ] consider offering option to allow users to query by `fetched_at`, `issued_at` or other date value
 - [ ] fun api endpoints like "do I need an umbrella today" endpoint
 
-Current tasks
+Improvements
+
+- [ ] fix forecast and other datetime responses that should be implicit VU timezone instead of returning UTC for **everything**.
+      Current tasks
+
+Tasks
 
 - [ ] improve `/raw/pages` endpoint
+
+## Roadmap
+
+- [ ] track volcano activity
+- [ ] track cyclone activity
+- [ ] track el nino level
