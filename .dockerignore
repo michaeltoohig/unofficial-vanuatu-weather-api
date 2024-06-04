@@ -1,0 +1,8 @@
+.git/
+.venv/
+
+tests/
+
+.env.development
+.env.production
+.env.template

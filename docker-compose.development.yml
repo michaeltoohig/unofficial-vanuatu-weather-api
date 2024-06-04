@@ -1,0 +1,24 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    command: uvicorn app.api.main:app --host 0.0.0.0 --reload
+    ports:
+      - 8000:8000
+    volumes:
+      - .:/app
+    environment:
+      VMGD_API_CONFIG_FILE: .env.development
+
+  scraper:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    command: python run_scraper_schedule.py
+    volumes:
+      - .:/app
+    environment:
+      VMGD_API_CONFIG_FILE: .env.development

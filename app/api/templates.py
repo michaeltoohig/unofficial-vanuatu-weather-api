@@ -14,7 +14,7 @@ from app.utils.datetime import as_vu, now
 
 
 _templates = Jinja2Templates(
-    directory=["app/templates"],  # type: ignore  # bad typing
+    directory=["app/api/templates"],  # type: ignore  # bad typing
     trim_blocks=True,
     lstrip_blocks=True,
 )

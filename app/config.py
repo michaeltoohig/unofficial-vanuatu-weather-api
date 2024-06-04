@@ -9,6 +9,7 @@ from app.version import get_version_commit
 
 ROOT_DIR = Path().parent.resolve()
 
+# TODO: consider replacing this with envvars from docker instead
 _CONFIG_FILE = os.getenv("VMGD_API_CONFIG_FILE", ".env")
 
 VERSION_COMMIT = "dev"
@@ -31,6 +32,7 @@ try:
 except FileNotFoundError:
     pass
 
+
 class Config(BaseModel):
     project_repo: str
     domain: str
@@ -42,8 +44,11 @@ class Config(BaseModel):
 
     vmgd_timeout: int = 15
     vmgd_base_url: str = "https://www.vmgd.gov.vu/vmgd/index.php"
-    vmgd_attribution: str = "The data provided was collected on the `fetched` date provided from the Vanuatu Meteorology & Geo-Hazards Department website at https://vmgd.gov.vu/. This service should not be used by anyone for anything; always get up-to-date and accurate data from the VMGD website directly."
+    vmgd_attribution: str = (
+        "The data provided was collected on the `fetched` date provided from the Vanuatu Meteorology & Geo-Hazards Department website at https://vmgd.gov.vu/. This service should not be used by anyone for anything; always get up-to-date and accurate data from the VMGD website directly."
+    )
     vmgd_image_path: str | None = None
+
 
 def load_config() -> Config:
     try:
@@ -52,6 +57,7 @@ def load_config() -> Config:
         raise ValueError(
             f"Please run the configuration wizard, {_CONFIG_FILE} is missing"
         )
+
 
 CONFIG = load_config()
 
