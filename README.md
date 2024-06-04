@@ -10,27 +10,38 @@ First setup the environment file.
 Update the values as needed.
 
 ```
-cp ./data/.env.template ./data/.env
+cp ./data/.env.template ./data/.env.development
 ```
 
-Then run the database migrations.
+Then build and start the container.
 
 ```
-alembic upgrade head
+docker compose -f docker-compose.development.yml build
+docker compose -f docker-compose.development.yml up
 ```
 
-Project commands are found in the `manage.py` file.
+The dev server for the API will started.
 
-To start the dev server:
-
-```
-python manage.py dev
-```
-
-To watch changes to scss files:
+Run database migrations as needed.
 
 ```
-python manage.py compile-scss --watch
+docker compose -f docker-compose.development.yml exec app alembic upgrade head
+```
+
+Then run the scraper.
+
+```
+docker compose -f docker-compose.development.yml exec app python run_scraper.py
+```
+
+#### SSR HTML
+
+I'm thinking of removing this due to it being ugly, lol.
+I can show I can do better.
+But, if you want to continue to develop the SSR application run the following to compile scss.
+
+```
+docker compose -f docker-compose.development.yml exec app boussole {compile|watch}
 ```
 
 ## Tests
@@ -38,7 +49,7 @@ python manage.py compile-scss --watch
 Run pytest.
 
 ```
-pytest tests/
+docker compose -f docker-compose.development.yml exec app pytest tests/
 ```
 
 ## TODO
