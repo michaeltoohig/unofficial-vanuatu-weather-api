@@ -77,3 +77,7 @@ VMGD_TIMEOUT = CONFIG.vmgd_timeout
 VMGD_BASE_URL = CONFIG.vmgd_base_url
 VMGD_ATTRIBUTION = CONFIG.vmgd_attribution
 VMGD_IMAGE_PATH = CONFIG.vmgd_image_path or ROOT_DIR / "data" / "vmgd" / "images"
+
+# bootstrap images directory
+if not Path(VMGD_IMAGE_PATH).exists():
+    Path(VMGD_IMAGE_PATH).mkdir(parents=True)
