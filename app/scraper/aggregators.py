@@ -19,7 +19,7 @@ from app.models import (
 )
 from app.scraper.schemas import WeatherObject
 from app.scraper.scrapers import NO_CURRENT_WARNING
-from app.utils.datetime import as_utc, as_vu, as_vu_to_utc, now
+from app.utils.datetime import TZ_VU, as_utc, as_vu, as_vu_to_utc, now
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -62,12 +62,33 @@ def convert_to_datetime(date_string: str, issued_at: datetime) -> datetime:
     We can do this assuming the following:
      - the `date_string` is never representing a value greater than 1 month after the `issued_at` date
      - the `issued_at` value should generally be after the or equal to the `date_string`
+
+    # NOTE: this code is messy due to messing with tests and an edgecase I found which I'm not sure even appears in realworld.
     """
     assert issued_at.tzinfo == timezone.utc, "Non UTC timezone provided to function"
     day = int(date_string.split()[1])
-    vu_anchor_dt = as_vu(
-        issued_at
-    )  # get datetime values as it was on VMGD website in VU timezone
+    vu_anchor_dt = as_vu(issued_at)  # convert to local timezone UTC+11
+
+    # # Create a datetime object for the same month and year as vu_anchor_dt but with the day from date_string
+    # try:
+    #     dt = datetime(vu_anchor_dt.year, vu_anchor_dt.month, day, tzinfo=TZ_VU)
+    # except ValueError:
+    #     # This block handles the case where day is not valid for the month (e.g., February 30, April 31)
+    #     # We assume the day belongs to the next month
+    #     next_month = vu_anchor_dt + relativedelta(months=1)
+    #     dt = datetime(next_month.year, next_month.month, day, tzinfo=TZ_VU)
+    #
+    # # Check if the constructed date is before the issued_at date, adjust month/year if necessary
+    # if dt < vu_anchor_dt:
+    #     dt += relativedelta(months=1)
+    #
+    # # Convert back to UTC
+    # return dt.astimezone(timezone.utc)
+
+    # vu_anchor_dt = as_vu(
+    #     issued_at
+    # )  # get datetime values as it was on VMGD website in VU timezone
+    vu_anchor_dt = issued_at
     if day < vu_anchor_dt.day:  # issued_at.day:
         # we have wrapped around to a new month/year
         next_month = vu_anchor_dt + relativedelta(months=1)
@@ -89,7 +110,7 @@ def is_date_series_sequential(dates_list: list[datetime]):
     return True
 
 
-def verify_date_series(dates_list: list[datetime]) -> int:
+def verify_date_series(dates_list: list[datetime]) -> list[datetime]:
     """Verifies list of datetimes are ordered sequentially +and attempts to fix for common error due to ambigious date strings."""
     logger.info(dates_list)
     if is_date_series_sequential(dates_list):

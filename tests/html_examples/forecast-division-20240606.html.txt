@@ -1,0 +1,5 @@
+Appears to fail when running `convert_to_datetime`.
+Investigate the edgecase here further.
+
+I believe it may be something to do with when I scraped this being just prior to a new issued at datetime and then a timezone conversion edgecase.
+
