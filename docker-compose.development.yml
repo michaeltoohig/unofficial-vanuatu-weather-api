@@ -6,8 +6,9 @@ services:
       target: development
     command: uvicorn app.api.main:app --host 0.0.0.0 --port 8000 --reload
     ports:
-      - ${app_port:-8000}:8000
+      - ${APP_PORT}:8000
     volumes:
       - .:/app
     environment:
+      APP_PORT: ${app_port:-8000}
       VMGD_API_CONFIG_FILE: .env.development
