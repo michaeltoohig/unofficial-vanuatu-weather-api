@@ -10,7 +10,6 @@ services:
     volumes:
       - ./data:/app/data
     environment:
-      APP_PORT: ${app_port}
       VMGD_API_CONFIG_FILE: .env.production
 
   scraper:
