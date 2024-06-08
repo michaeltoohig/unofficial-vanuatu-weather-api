@@ -22,7 +22,7 @@ except ImportError:
 VERSION = f"0.3.0+{VERSION_COMMIT}"
 USER_AGENT = f"vmgd-api/{VERSION}"
 
-PROJECT_NAME = "Vanuatu Weather API"
+PROJECT_NAME = "Unofficial Vanuatu Meteorology & Geo-Hazards Department API"
 
 # Force reloading cache when the CSS is updated
 CSS_HASH = "none"

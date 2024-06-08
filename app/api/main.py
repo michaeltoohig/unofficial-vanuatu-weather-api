@@ -77,7 +77,6 @@ class CustomMiddleware:
                 # And add the security headers
                 headers = MutableHeaders(scope=message)
                 headers["X-Request-ID"] = request_id
-                # headers["x-powered-by"] = "microblogpub"
                 headers["referrer-policy"] = (
                     "no-referrer, strict-origin-when-cross-origin"
                 )
@@ -190,38 +189,38 @@ async def custom_http_exception_handler(
 async def index_page(
     request: Request,
 ) -> RedirectResponse:
-    return RedirectResponse(request.url_for("forecast_page"))
+    return RedirectResponse("/docs")  # request.url_for("forecast_page"))
 
 
-@app.get("/forecast", include_in_schema=False)
-async def forecast_page(
-    request: Request,
-    db_session: AsyncSession = Depends(get_db_session),
-    *,
-    location: LocationSlugDep,
-) -> templates.TemplateResponse:
-    if not location:
-        location = await get_location_by_name(
-            db_session, name="Port Vila"
-        )  # default value
-    forecasts = await get_latest_forecasts(db_session, location=location, dt=now())
-    return await templates.render_template(
-        db_session,
-        request,
-        "index.html",
-        {
-            "forecasts": forecasts,
-        },
-    )
+# @app.get("/forecast", include_in_schema=False)
+# async def forecast_page(
+#     request: Request,
+#     db_session: AsyncSession = Depends(get_db_session),
+#     *,
+#     location: LocationSlugDep,
+# ) -> templates.TemplateResponse:
+#     if not location:
+#         location = await get_location_by_name(
+#             db_session, name="Port Vila"
+#         )  # default value
+#     forecasts = await get_latest_forecasts(db_session, location=location, dt=now())
+#     return await templates.render_template(
+#         db_session,
+#         request,
+#         "index.html",
+#         {
+#             "forecasts": forecasts,
+#         },
+#     )
 
 
-@app.get("/about", include_in_schema=False)
-async def about_page(
-    request: Request,
-    db_session: AsyncSession = Depends(get_db_session),
-) -> templates.TemplateResponse:
-    # TODO return about page, explain reason for website, roadmap, etc.
-    raise NotImplementedError
+# @app.get("/about", include_in_schema=False)
+# async def about_page(
+#     request: Request,
+#     db_session: AsyncSession = Depends(get_db_session),
+# ) -> templates.TemplateResponse:
+#     # TODO return about page, explain reason for website, roadmap, etc.
+#     raise NotImplementedError
 
 
 @app.get("/ping", include_in_schema=False)
