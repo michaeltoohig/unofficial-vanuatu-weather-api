@@ -1,7 +1,8 @@
 from datetime import datetime, timedelta, timezone
-from typing import Annotated
+from typing import Annotated, Optional
 
 from fastapi import Depends, Query
+from pydantic import BaseModel, validator, ValidationError
 import sqlalchemy as sa
 
 TZ_VU = timezone(timedelta(hours=11))  # hardcoded value for our target data source
@@ -38,12 +39,33 @@ class UTCDateTime(sa.types.TypeDecorator):
             return value.replace(tzinfo=timezone.utc)
 
 
-def get_datetime_dependency(
-    date: str = Query(
-        None,
-        regex="^(\d{4}-\d{2}-\d{2})|(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6})|(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}Z)|([+-]\\d{2}:\\d{2})$",
-    )
-):
+class DateTimeQuery(BaseModel):
+    date: Optional[str] = None
+
+    @validator("date")
+    def validate_date(cls, value):
+        if value is None:
+            return value
+
+        try:
+            # Try to parse as ISO date
+            parsed_date = datetime.fromisoformat(value)
+        except ValueError:
+            try:
+                # Try to parse as ISO datetime without timezone
+                parsed_date = datetime.fromisoformat(value + "Z")
+            except ValueError:
+                try:
+                    # Parse as ISO datetime with timezone
+                    parsed_date = datetime.strptime(value, "%Y-%m-%dT%H:%M:%S.%f%z")
+                except ValueError:
+                    raise ValueError("Invalid date format")
+
+        # Convert to UTC datetime
+        return parsed_date.astimezone(timezone.utc)
+
+
+def get_datetime_dependency(date: str = Query(None)):
     """
     Returns UTC datetime from ISO formatted datetime string in query.
     """
@@ -51,20 +73,10 @@ def get_datetime_dependency(
         return None
 
     try:
-        # Try to parse as ISO date
-        parsed_date = datetime.fromisoformat(date)
-    except ValueError:
-        try:
-            # Try to parse as ISO datetime without timezone
-            parsed_date = datetime.fromisoformat(date + "Z")
-        except ValueError:
-            # Parse as ISO datetime with timezone
-            parsed_date = datetime.strptime(date, "%Y-%m-%dT%H:%M:%S.%f%z")
-
-    # Convert to UTC datetime
-    d = parsed_date.astimezone(timezone.utc)
-    print(d)
-    return d
+        query = DateTimeQuery(date=date)
+        return query.date
+    except ValidationError as e:
+        raise ValueError(f"Invalid date format: {e}")
 
 
 DateDep = Annotated[datetime, Depends(get_datetime_dependency)]

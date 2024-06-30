@@ -1,33 +1,31 @@
-from dataclasses import dataclass
+from pydantic import BaseModel, Field
 from datetime import datetime
-from typing import Any
+from typing import Any, Generic, TypeVar, List, Optional
+import pytz
 
+from app import config
 from app.scraper.scrapers import NO_CURRENT_WARNING
 
 
-@dataclass
-class LocationResponse:
+class LocationResponseData(BaseModel):
     id: int
     name: str
     latitude: float
     longitude: float
 
 
-@dataclass
-class RawPageResponse:
+class RawPageResponseData(BaseModel):
     url: str
     data: Any
 
 
-@dataclass
-class RawSessionResponse:
+class RawSessionResponseData(BaseModel):
     name: str
     success: bool
-    started_at: datetime | None = None  # XXX maybe remove this optional
+    started_at: datetime
 
 
-@dataclass
-class ForecastResponse:
+class ForecastResponseData(BaseModel):
     location: int
     date: datetime
     summary: str
@@ -36,19 +34,51 @@ class ForecastResponse:
     minHumi: int
     maxHumi: int
 
+    def __init__(self, **data):
+        super().__init__(**data)
+        vu_tz = pytz.timezone("Pacific/Efate")
+        self.date = self.date.astimezone(vu_tz)
 
-@dataclass
-class ForecastMediaResponse:
+
+class ForecastMediaResponseData(BaseModel):
     summary: str
-    images: list[str] | None = None
+    images: Optional[List[str]] = None
 
 
-@dataclass
-class WeatherWarningResponse:
+class WeatherWarningResponseData(BaseModel):
     date: datetime
     name: str
-    body: str | None
+    body: Optional[str] = None
 
-    def __post_init__(self):
+    def __init__(self, **data):
+        super().__init__(**data)
         if self.body is None:
             self.body = NO_CURRENT_WARNING
+        vu_tz = pytz.timezone("Pacific/Efate")
+        self.date = self.date.astimezone(vu_tz)
+
+
+class VmgdApiResponseMeta(BaseModel):
+    issued: datetime
+    fetched: datetime
+    attribution: str = Field(default=config.VMGD_ATTRIBUTION)
+
+
+class VmgdApiResponse(BaseModel):
+    meta: VmgdApiResponseMeta
+
+
+class VmgdApiForecastResponse(VmgdApiResponse):
+    data: list[ForecastResponseData]
+
+
+class VmgdApiForecastMediaResponse(VmgdApiResponse):
+    data: ForecastMediaResponseData
+
+
+class VmgdApiWeatherWarningResponse(VmgdApiResponse):
+    data: WeatherWarningResponseData
+
+
+class VmgdApiWeatherWarningsResponse(VmgdApiResponse):
+    data: list[WeatherWarningResponseData]

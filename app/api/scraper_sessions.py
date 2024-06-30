@@ -4,24 +4,32 @@ from fastapi import Query, Depends
 from fastapi.exceptions import HTTPException
 from loguru import logger
 
-from app.scraper.sessions import SessionName, WEATHER_WARNING_SESSIONS
+from app.scraper.sessions import ForecastSession, WarningSession
 
 
-async def get_scraper_session_dep(session_name: str = Query(None, alias="name")):
+async def get_forecast_session_dep(
+    session_name: ForecastSession = Query(None, alias="name")
+):
     if session_name is None:
         return None
     try:
-        session = SessionName(session_name)
+        session = ForecastSession(session_name)
     except ValueError:
         raise HTTPException(status_code=400, detail="Not a valid scraper session name")
     return session
 
 
-ScraperSessionDep = Annotated[SessionName, Depends(get_scraper_session_dep)]
+ScraperSessionDep = Annotated[ForecastSession, Depends(get_forecast_session_dep)]
 
 
-async def get_warning_weather_scraper_session_dep(session: ScraperSessionDep):
-    if session not in WEATHER_WARNING_SESSIONS:
+async def get_warning_session_dep(
+    session_name: WarningSession = Query(None, alias="name")
+):
+    if session_name is None:
+        return None
+    try:
+        session = WarningSession(session_name)
+    except ValueError:
         raise HTTPException(
             status_code=400, detail="Not a valid weather warning scraper session name"
         )
@@ -29,5 +37,5 @@ async def get_warning_weather_scraper_session_dep(session: ScraperSessionDep):
 
 
 WeatherWarningScraperSessionDep = Annotated[
-    SessionName, Depends(get_warning_weather_scraper_session_dep)
+    WarningSession, Depends(get_warning_session_dep)
 ]

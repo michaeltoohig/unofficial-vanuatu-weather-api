@@ -6,15 +6,13 @@ from loguru import logger
 
 from app import models
 from app.database import AsyncSession
-from app.scraper.sessions import WEATHER_WARNING_SESSIONS, SessionName
+from app.scraper.sessions import WarningSession
 
 
 async def _get_latest_weather_warning_session_subquery(
-    db_session: AsyncSession,
-    session_name: SessionName,
+    session_name: WarningSession,
     dt: datetime | None,
 ):
-    # TODO review use of this function
     subquery = (
         select(models.Session.id)
         .join(models.Session.weather_warnings)
@@ -32,18 +30,12 @@ async def _get_latest_weather_warning_session_subquery(
     )
 
 
-async def get_latest_weather_warnings(
+async def get_latest_weather_warning(
     db_session: AsyncSession,
-    session_name: SessionName,
+    session_name: WarningSession,
     dt: datetime | None = None,
-) -> list[models.WeatherWarning] | None:
-    assert (
-        session_name in WEATHER_WARNING_SESSIONS
-    ), "session_name is not a weather warning session"
-
-    subquery = await _get_latest_weather_warning_session_subquery(
-        db_session, session_name, dt
-    )
+) -> models.WeatherWarning | None:
+    subquery = await _get_latest_weather_warning_session_subquery(session_name, dt)
     query = select(models.WeatherWarning).where(
         models.WeatherWarning.session_id == subquery
     )
@@ -53,6 +45,5 @@ async def get_latest_weather_warnings(
         query = query.where(
             models.WeatherWarning.date >= start, models.WeatherWarning.date < end
         )
-
-    ww = (await db_session.execute(query)).scalars().all()
+    ww = (await db_session.execute(query)).scalars().first()
     return ww

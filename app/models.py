@@ -5,12 +5,10 @@ from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import Boolean, Column, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship, synonym
-from sqlalchemy.ext.hybrid import hybrid_property
 from app.config import ROOT_DIR, VMGD_IMAGE_PATH
 
 from app.database import Base
 
-# from app.scraper.sessions import SessionName
 from app.utils.datetime import now, UTCDateTime
 from app.utils.slugify import slugify
 
@@ -38,18 +36,6 @@ class Session(Base):
         self._name = name
 
     fetched_at = synonym("started_at")
-
-    # @hybrid_property
-    # def name(self):
-    #     return SessionName(self._name)
-
-    # @name.setter
-    # def name(self, value: SessionName):
-    #     self._name = value.value
-
-    # @name.expression
-    # def name(cls):
-    #     return cls._name
 
 
 class Page(Base):
@@ -156,7 +142,9 @@ class Location(Base):
     updated_at = Column(UTCDateTime(), nullable=False, default=now)
 
     name = Column(String, nullable=False, unique=True)
-    slug = Column(String, nullable=False)  # NOTE unique name will enforce a unique here for our small dataset
+    slug = Column(
+        String, nullable=False
+    )  # NOTE unique name will enforce a unique here for our small dataset
     latitude = Column(Float, nullable=False)
     longitude = Column(Float, nullable=False)
 
@@ -201,7 +189,7 @@ class ForecastMedia(Base):
 
     issued_at = Column(UTCDateTime(), nullable=False)
     summary = Column(String, nullable=False)
-    
+
 
 class Image(Base):
     __tablename__ = "image"
@@ -216,7 +204,9 @@ class Image(Base):
     def __init__(self, session_id: int, issued_at: datetime, filepath: Path) -> None:
         self.session_id = session_id
         self.issued_at = issued_at
-        assert filepath.relative_to(VMGD_IMAGE_PATH), "Image filepath is not subdirectory of root VMGD images directory"
+        assert filepath.relative_to(
+            VMGD_IMAGE_PATH
+        ), "Image filepath is not subdirectory of root VMGD images directory"
         self._server_filepath = str(filepath.relative_to(VMGD_IMAGE_PATH))
 
     @property
@@ -231,17 +221,10 @@ class WeatherWarning(Base):
     session_id = Column(Integer, ForeignKey("session.id"), nullable=False)
     session = relationship("Session", lazy="joined", back_populates="weather_warnings")
 
-    # category = Column(String, nullable=False)  # the slug of the page or just use the SessionName
-
     issued_at = Column(UTCDateTime(), nullable=False)
     date = Column(UTCDateTime(), nullable=False)
     no_current_warning = Column(Boolean, nullable=False)
     body = Column(String)
-
-    # @property
-    # def category(self):
-    #     # TODO use a `property` on session to avoid `_name`
-    #     return self.session._name
 
     def __init__(
         self, session_id: int, issued_at: datetime, date: datetime, body: str = None

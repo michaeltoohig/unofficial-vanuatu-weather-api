@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from itertools import chain
 from typing import Any
 
 from fastapi import Request
@@ -8,7 +9,7 @@ from starlette.templating import _TemplateResponse as TemplateResponse
 from app import config
 from app.config import DEBUG, PROJECT_REPO, VERSION, PROJECT_NAME
 from app.database import AsyncSession
-from app.scraper.sessions import SessionName
+from app.scraper.sessions import ForecastSession, WarningSession
 from app.scraper_sessions import get_latest_scraper_session
 from app.utils.datetime import as_vu, now
 
@@ -31,16 +32,11 @@ def forecast_date(value: datetime):
 
 def degrees(value: str):
     """Returns given temperature value as HTML ready string with superscript degrees C."""
-    # alternative to ° is ℃
+    # alternative to "°" is "℃"
     value = int(
         value
     )  # sanity check to be sure we only get integers since I don't want to call `safe` on the results of this if strings are passed
     return f"{value}<small><sup>℃</sup></small>"
-
-
-# def vu_date_str(value):
-#     dt = as_vu(value)
-#     return dt.strftime("%Y %B %d")
 
 
 def vu_datetime_str(value):
@@ -51,7 +47,6 @@ def vu_datetime_str(value):
 _templates.env.filters["forecast_date"] = forecast_date
 _templates.env.filters["degrees"] = degrees
 _templates.env.filters["vanuatu_time"] = as_vu
-# _templates.env.filters["vu_date"] = vu_date_str
 _templates.env.filters["vu_datetime"] = vu_datetime_str
 
 
@@ -67,9 +62,11 @@ async def render_template(
         template_args = {}
 
     scraper_sessions = []
-    for sn in SessionName:
-        ss = await get_latest_scraper_session(db_session, name=sn)
-        scraper_sessions.append(ss)
+    for session_name in chain(ForecastSession, WarningSession):
+        session = await get_latest_scraper_session(
+            db_session, session_name=session_name
+        )
+        scraper_sessions.append(session)
 
     github_icon = request.url_for("static", path="github.svg")
 

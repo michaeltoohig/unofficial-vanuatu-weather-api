@@ -1,4 +1,5 @@
 """Actions related to the forecasts."""
+
 from datetime import datetime, timedelta
 from sqlalchemy import select
 
@@ -6,12 +7,11 @@ from loguru import logger
 
 from app import models
 from app.database import AsyncSession
-from app.scraper.sessions import SessionName
+from app.scraper.sessions import ForecastSession
 from app.scraper_sessions import get_latest_scraper_session
 
 
 async def _get_latest_forecast_session_subquery(
-    db_session: AsyncSession,
     location: models.Location,
     dt: datetime,
 ):
@@ -40,18 +40,19 @@ async def get_latest_forecasts(
     if location:
         query = query.where(models.ForecastDaily.location_id == location.id)
     if dt:
-        subq = await _get_latest_forecast_session_subquery(db_session, location, dt)
+        subq = await _get_latest_forecast_session_subquery(location, dt)
         threshold = dt - timedelta(days=1)
         query = (
-            query
-            .where(models.ForecastDaily.session_id == subq)
+            query.where(models.ForecastDaily.session_id == subq)
             .where(models.ForecastDaily.date > threshold)
             .where(models.ForecastDaily.date <= dt)
             .order_by(models.ForecastDaily.date.desc())
             .limit(1)
         )
     else:
-        session = await get_latest_scraper_session(db_session, name=SessionName.FORECAST_GENERAL)
+        session = await get_latest_scraper_session(
+            db_session, session_name=ForecastSession.FORECAST_GENERAL
+        )
         query = query.where(models.ForecastDaily.session_id == session.id)
     forecasts = (await db_session.execute(query)).scalars().all()
     return forecasts

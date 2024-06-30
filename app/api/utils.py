@@ -1,59 +1,28 @@
-# TODO: rename this file
-#
 from datetime import datetime
-from typing import Any
-from dataclasses import dataclass, field
+from typing import Any, Type, TypeVar
 
-from fastapi import Request
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from app import config
-from app.api.responses import WeatherWarningResponse
-from app.weather_warnings import get_latest_weather_warnings
+from app.api.responses import (
+    VmgdApiResponse,
+    VmgdApiResponseMeta,
+)
 
 
-@dataclass
-class VmgdApiResponseMeta:
-    issued: datetime
-    fetched: datetime
-    attribution: str = field(default=config.VMGD_ATTRIBUTION)
-
-
-@dataclass
-class VmgdApiResponse:
-    meta: VmgdApiResponseMeta
-    data: Any
-    # warnings: list[WeatherWarningResponse] | None = None  # XXX seems unnecessary and messy to implement given the primary resource may be filtered by date then does that mmean we return filtered warnings also? Just dedicate an endpoint to warnings seems better IMO ATM.
+VmgdResponseT = TypeVar("VmgdResponseT", bound=VmgdApiResponse)
 
 
 async def render_vmgd_api_response(
-    db_session: AsyncSession,
-    request: Request,
     data: Any,
     *,
+    response_class: Type[VmgdResponseT],
     issued: datetime,
     fetched: datetime,
-    skip_warnings: bool = False,
 ) -> VmgdApiResponse:
-    resp = VmgdApiResponse(
+    resp = response_class(
+        # remove microsecond for presentation purpose only
         meta=VmgdApiResponseMeta(
-            issued=issued,
-            fetched=fetched,
+            issued=issued.replace(microsecond=0),
+            fetched=fetched.replace(microsecond=0),
         ),
         data=data,
     )
-    # if not skip_warnings:
-    #     weather_warnings = await get_latest_weather_warnings(db_session)
-    #     weather_warnings = list(filter(lambda ww: ww.no_current_warning is False, weather_warnings))
-    #     import pdb; pdb.set_trace()  # fmt: skip
-    #     # XXX does this work???
-    #     warning_data = [
-    #         WeatherWarningResponse(
-    #             date=w.date,
-    #             name=w.session._name,
-    #             body=w.body,
-    #         )
-    #         for w in weather_warnings
-    #     ]
-    #     resp.warnings = warning_data
     return resp
