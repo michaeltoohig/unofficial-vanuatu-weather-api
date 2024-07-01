@@ -67,6 +67,7 @@ Improvements
 Tasks
 
 - [ ] improve `/raw/pages` endpoint
+  - I removed these endpoints for now
 
 ## Roadmap
 

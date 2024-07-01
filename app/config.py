@@ -19,10 +19,15 @@ try:
 except ImportError:
     VERSION_COMMIT = get_version_commit()
 
-VERSION = f"0.3.0+{VERSION_COMMIT}"
+VERSION = f"0.4.0+{VERSION_COMMIT}"
 USER_AGENT = f"vmgd-api/{VERSION}"
 
-PROJECT_NAME = "Unofficial Vanuatu Meteorology & Geo-Hazards Department API"
+PROJECT_NAME = "Unofficial VMGD API"
+PROJECT_SUMMARY = """
+An **unofficial** API for the [Vanuatu Meteorology & Geo-Hazards Department](https://www.vmgd.gov.vu/) providing historical data from periodic web scraping.
+
+Always get up-to-date and accurate data from the VMGD website directly; this service should not be used by anyone for anything.
+"""
 
 # Force reloading cache when the CSS is updated
 CSS_HASH = "none"

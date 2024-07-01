@@ -14,7 +14,14 @@ from loguru import logger
 from starlette.datastructures import Headers, MutableHeaders
 from starlette.types import Message
 
-from app.config import DEBUG, ROOT_DIR, VMGD_IMAGE_PATH, PROJECT_NAME
+from app.config import (
+    DEBUG,
+    PROJECT_SUMMARY,
+    ROOT_DIR,
+    VMGD_IMAGE_PATH,
+    PROJECT_NAME,
+    VERSION,
+)
 from app.api.endpoints import api_router
 
 
@@ -102,7 +109,11 @@ class CustomMiddleware:
         return None
 
 
-app = FastAPI(title=PROJECT_NAME)  # docs_url=None, redoc_url=None)
+app = FastAPI(
+    title=PROJECT_NAME,
+    description=PROJECT_SUMMARY,
+    version=VERSION,
+)  # docs_url=None, redoc_url=None)
 app.mount("/static", StaticFiles(directory="app/api/static"), name="static")
 app.mount(
     "/images",

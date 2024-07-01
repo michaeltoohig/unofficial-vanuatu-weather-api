@@ -47,7 +47,7 @@ async def get_locations(
     ]
 
 
-@api_router.get("/forecast")
+@api_router.get("/forecasts")
 async def get_forecasts(
     db_session: AsyncSession = Depends(get_db_session),
     *,
